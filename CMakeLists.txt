@@ -1,9 +1,9 @@
 project(msgpuck)
 cmake_minimum_required(VERSION 2.8.5)
 
-if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANG)
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -fPIC -fstrict-aliasing")
-	set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wall -Wextra -Werror")
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -fPIC -fstrict-aliasing")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wall -Wextra -Werror")
 endif()
 
 if(NOT CMAKE_BUILD_TYPE)

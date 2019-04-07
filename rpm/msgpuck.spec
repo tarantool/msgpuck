@@ -15,6 +15,14 @@ BuildRequires: doxygen >= 1.6.0
 # Nothing to add to -debuginfo package - this library is header-only
 %global debug_package %{nil}
 
+# Use strip from devtoolset instead of /usr/bin/strip to avoid 'invalid
+# relocation type 42' error on CentOS 6.
+# https://bugzilla.redhat.com/show_bug.cgi?id=1545386#c5
+# https://stackoverflow.com/a/48801417
+%if 0%{?rhel} == 6
+%global __strip /opt/rh/devtoolset-6/root/usr/bin/strip
+%endif
+
 %package devel
 Summary: Lightweight MessagePack library
 Provides: msgpuck-static = %{version}-%{release}

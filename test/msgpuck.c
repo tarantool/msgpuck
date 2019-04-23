@@ -51,14 +51,17 @@ static char *data = buf + 1; /* use unaligned address to fail early */
 #define SCALAR(x) x
 #define COMPLEX(x)
 
-#define DEFINE_TEST(_type, _complex, _v, _r, _rl) ({                           \
-	const char *d1 = mp_encode_##_type(data, (_v));                        \
+#define COMMA ,
+
+#define DEFINE_TEST(_type, _complex, _ext, _v, _r, _rl) ({		       \
+	_ext(int8_t ext_type = 0);					       \
+	const char *d1 = mp_encode_##_type(data, _ext(ext_type COMMA) (_v));   \
 	const char *d2 = data;                                                 \
 	_complex(const char *d3 = data);                                       \
 	_complex(const char *d4 = data);                                       \
 	note(""#_type" "#_v"");                                                \
 	is(mp_check_##_type(data, d1), 0, "mp_check_"#_type"("#_v") == 0");    \
-	is(mp_decode_##_type(&d2), (_v), "mp_decode(mp_encode("#_v")) == "#_v);\
+	is(mp_decode_##_type(&d2 _ext(COMMA &ext_type)), (_v), "mp_decode(mp_encode("#_v")) == "#_v);\
 	_complex(mp_next(&d3));                                                \
 	_complex(ok(!mp_check(&d4, d3 + _rl), "mp_check("#_v")"));             \
 	is((d1 - data), (_rl), "len(mp_encode_"#_type"("#_v")");               \
@@ -70,20 +73,23 @@ static char *data = buf + 1; /* use unaligned address to fail early */
 	})
 
 
-#define DEFINE_TEST_STRBIN(_type, _vl) ({                                      \
+#define DEFINE_TEST_STRBINEXT(_type, _not_ext, _ext, _vl) ({		       \
 	note(""#_type" len="#_vl"");                                           \
 	char *s1 = str;                                                        \
 	for (uint32_t i = 0; i < _vl; i++) {                                   \
 		s1[i] = 'a' + i % 26;                                          \
-	}                                                                      \
-	const char *d1 = mp_encode_##_type(data, s1, _vl);                     \
+	}								       \
+	_ext(int8_t ext_type = 0);					       \
+	const char *d1 = mp_encode_##_type(data, _ext(ext_type COMMA) s1, _vl);\
 	const char *d2;                                                        \
 	uint32_t len2;                                                         \
 	d2 = data;                                                             \
-	const char *s2 = mp_decode_##_type(&d2, &len2);                        \
+	const char *s2 = mp_decode_##_type(&d2, _ext(&ext_type COMMA) &len2);  \
 	is(_vl, len2, "len(mp_decode_"#_type"(x, %u))", _vl);                  \
+	_ext(is(ext_type, 0, "type(mp_decode_"#_type"(x))"));		       \
 	d2 = data;                                                             \
-	(void) mp_decode_strbin(&d2, &len2);                                   \
+	_not_ext((void) mp_decode_strbin(&d2, &len2));                         \
+	_ext((void) mp_decode_ext(&d2, &ext_type, &len2));		       \
 	is(_vl, len2, "len(mp_decode_strbin(x, %u))", _vl);                    \
 	const char *d3 = data;                                                 \
 	mp_next(&d3);                                                          \
@@ -98,17 +104,19 @@ static char *data = buf + 1; /* use unaligned address to fail early */
 	is(memcmp(s1, s2, _vl), 0, "mp_encode_"#_type"(x, "#_vl") == x");      \
 })
 
-#define test_uint(...)   DEFINE_TEST(uint, SCALAR, __VA_ARGS__)
-#define test_int(...)    DEFINE_TEST(int, SCALAR, __VA_ARGS__)
-#define test_bool(...)   DEFINE_TEST(bool, SCALAR, __VA_ARGS__)
-#define test_float(...)  DEFINE_TEST(float, SCALAR, __VA_ARGS__)
-#define test_double(...) DEFINE_TEST(double, SCALAR, __VA_ARGS__)
-#define test_strl(...)   DEFINE_TEST(strl, COMPLEX, __VA_ARGS__)
-#define test_binl(...)   DEFINE_TEST(binl, COMPLEX, __VA_ARGS__)
-#define test_array(...)  DEFINE_TEST(array, COMPLEX, __VA_ARGS__)
-#define test_map(...)    DEFINE_TEST(map, COMPLEX, __VA_ARGS__)
-#define test_str(...)    DEFINE_TEST_STRBIN(str, __VA_ARGS__)
-#define test_bin(...)    DEFINE_TEST_STRBIN(bin, __VA_ARGS__)
+#define test_uint(...)   DEFINE_TEST(uint, SCALAR, COMPLEX, __VA_ARGS__)
+#define test_int(...)    DEFINE_TEST(int, SCALAR, COMPLEX, __VA_ARGS__)
+#define test_bool(...)   DEFINE_TEST(bool, SCALAR, COMPLEX, __VA_ARGS__)
+#define test_float(...)  DEFINE_TEST(float, SCALAR, COMPLEX, __VA_ARGS__)
+#define test_double(...) DEFINE_TEST(double, SCALAR, COMPLEX, __VA_ARGS__)
+#define test_strl(...)   DEFINE_TEST(strl, COMPLEX, COMPLEX, __VA_ARGS__)
+#define test_binl(...)   DEFINE_TEST(binl, COMPLEX, COMPLEX, __VA_ARGS__)
+#define test_extl(...)	 DEFINE_TEST(extl, COMPLEX, SCALAR, __VA_ARGS__)
+#define test_array(...)  DEFINE_TEST(array, COMPLEX, COMPLEX, __VA_ARGS__)
+#define test_map(...)    DEFINE_TEST(map, COMPLEX, COMPLEX, __VA_ARGS__)
+#define test_str(...)    DEFINE_TEST_STRBINEXT(str, SCALAR, COMPLEX, __VA_ARGS__)
+#define test_bin(...)    DEFINE_TEST_STRBINEXT(bin, SCALAR, COMPLEX, __VA_ARGS__)
+#define test_ext(...)	 DEFINE_TEST_STRBINEXT(ext, COMPLEX, SCALAR, __VA_ARGS__)
 
 static int
 test_uints(void)
@@ -342,6 +350,53 @@ test_binls(void)
 }
 
 static int
+test_extls(void)
+{
+	plan(168);
+	header();
+
+	/* fixext 1,2,4,8,16 */
+	test_extl(0x01U, "\xd4\x00", 2);
+	test_extl(0x02U, "\xd5\x00", 2);
+	test_extl(0x04U, "\xd6\x00", 2);
+	test_extl(0x08U, "\xd7\x00", 2);
+	test_extl(0x10U, "\xd8\x00", 2);
+
+	/* ext 8 */
+	test_extl(0x11U, "\xc7\x11\x00", 3);
+	test_extl(0xfeU, "\xc7\xfe\x00", 3);
+	test_extl(0xffU, "\xc7\xff\x00", 3);
+
+	test_extl(0x00U, "\xc7\x00\x00", 3);
+	test_extl(0x03U, "\xc7\x03\x00", 3);
+	test_extl(0x05U, "\xc7\x05\x00", 3);
+	test_extl(0x06U, "\xc7\x06\x00", 3);
+	test_extl(0x07U, "\xc7\x07\x00", 3);
+	test_extl(0x09U, "\xc7\x09\x00", 3);
+	test_extl(0x0aU, "\xc7\x0a\x00", 3);
+	test_extl(0x0bU, "\xc7\x0b\x00", 3);
+	test_extl(0x0cU, "\xc7\x0c\x00", 3);
+	test_extl(0x0dU, "\xc7\x0d\x00", 3);
+	test_extl(0x0eU, "\xc7\x0e\x00", 3);
+	test_extl(0x0fU, "\xc7\x0f\x00", 3);
+
+	/* ext 16 */
+	test_extl(0x0100U, "\xc8\x01\x00\x00", 4);
+	test_extl(0x0101U, "\xc8\x01\x01\x00", 4);
+	test_extl(0xfffeU, "\xc8\xff\xfe\x00", 4);
+	test_extl(0xffffU, "\xc8\xff\xff\x00", 4);
+
+	/* ext 32 */
+	test_extl(0x00010000U, "\xc9\x00\x01\x00\x00\x00", 6);
+	test_extl(0x00010001U, "\xc9\x00\x01\x00\x01\x00", 6);
+	test_extl(0xfffffffeU, "\xc9\xff\xff\xff\xfe\x00", 6);
+	test_extl(0xffffffffU, "\xc9\xff\xff\xff\xff\x00", 6);
+
+	footer();
+	return check_plan();
+}
+
+static int
 test_strs(void)
 {
 	plan(96);
@@ -382,6 +437,45 @@ test_bins(void)
 	test_bin(0xffff);
 	test_bin(0x10000);
 	test_bin(0x10001);
+
+	footer();
+	return check_plan();
+}
+
+static int
+test_exts(void)
+{
+	plan(225);
+	header();
+
+	test_ext(0x01);
+	test_ext(0x02);
+	test_ext(0x03);
+	test_ext(0x04);
+	test_ext(0x05);
+	test_ext(0x06);
+	test_ext(0x07);
+	test_ext(0x08);
+	test_ext(0x09);
+	test_ext(0x0a);
+	test_ext(0x0b);
+	test_ext(0x0c);
+	test_ext(0x0d);
+	test_ext(0x0e);
+	test_ext(0x0f);
+	test_ext(0x10);
+
+	test_ext(0x11);
+	test_ext(0xfe);
+	test_ext(0xff);
+
+	test_ext(0x0100);
+	test_ext(0x0101);
+	test_ext(0xfffe);
+	test_ext(0xffff);
+
+	test_ext(0x00010000);
+	test_ext(0x00010001);
 
 	footer();
 	return check_plan();
@@ -786,9 +880,8 @@ test_mp_print()
 	d = mp_encode_double(d, 3.14);
 	d = mp_encode_uint(d, 100);
 	d = mp_encode_uint(d, 500);
-	*d++ = 0xd4; /* let's pack smallest fixed ext */
-	*d++ = 0;
-	*d++ = 0;
+	/* let's pack zero-length ext */
+	d = mp_encode_extl(d, 0, 0);
 	char bin[] = "\x12test\x34\b\t\n\"bla\\-bla\"\f\r";
 	d = mp_encode_bin(d, bin, sizeof(bin));
 	assert(d <= msgpack + sizeof(msgpack));
@@ -1096,7 +1189,7 @@ test_overflow()
 
 int main()
 {
-	plan(20);
+	plan(22);
 	test_uints();
 	test_ints();
 	test_bools();
@@ -1105,8 +1198,10 @@ int main()
 	test_nils();
 	test_strls();
 	test_binls();
+	test_extls();
 	test_strs();
 	test_bins();
+	test_exts();
 	test_arrays();
 	test_maps();
 	test_next_on_arrays();

@@ -510,6 +510,81 @@ MP_PROTO uint32_t
 mp_decode_map(const char **data);
 
 /**
+ * \brief calculate exact buffer size needed to store
+ * ext header for a value of length \a len.
+ * \param len value length in bytes.
+ * \retval buffer size in bytes
+ */
+MP_PROTO uint32_t
+mp_sizeof_extl(uint32_t len);
+
+/**
+ * \brief Equivalent to mp_sizeof_extl(\a len) + \a len.
+ * \param len - a extension data length
+ * \return size in chars (max is 6 + \a len)
+ */
+MP_PROTO uint32_t
+mp_sizeof_ext(uint32_t len);
+
+/**
+ * \brief Encode extension header with \a type and
+ * value length \a len.
+ * The value must be encoded after the header.
+ * \return \a data + \link mp_sizeof_extl() mp_sizeof_extl(size)\endlink
+ */
+MP_PROTO char *
+mp_encode_extl(char *data, int8_t type, uint32_t len);
+
+/**
+ * \brief Encode extension data of length \a len.
+ * The function is equivalent to mp_encode_extl() + memcpy.
+ * \param data - a buffer
+ * \param type - extension type to encode
+ * \param str - a pointer to extension data
+ * \param len - a extension data length
+ * \return \a data + mp_sizeof_ext(\a len) ==
+ * data + mp_sizeof_extl(\a len) + \a len
+ * \sa mp_encode_strl
+ */
+MP_PROTO char *
+mp_encode_ext(char *data, int8_t type, char *str, uint32_t len);
+
+/**
+ * \brief Check that \a cur buffer has enough bytes to decode an ext header.
+ * \param cur buffer
+ * \param end end of the buffer
+ * \retval 0 - buffer has enough bytes
+ * \retval > 0 - the numbeer of remaining bytes to read
+ * \pre cur < end
+ * \pre mp_typeof(*cur) == MP_EXT
+ */
+MP_PROTO ptrdiff_t
+mp_check_extl(const char *cur, const char *end);
+
+/**
+ * \brief Decode an extension header from MsgPack \a data.
+ *
+ * The extension type value must be decoded after the header.
+ * \param data - the pointer to a buffer.
+ * \param type - decoded type of the following value.
+ * \retval - the length of the following ext value.
+ * \post *data = *data + mp_sizeof_extl(length)
+ */
+MP_PROTO uint32_t
+mp_decode_extl(const char **data, int8_t *type);
+
+/**
+ * \brief Decode an extension from MsgPack \a data
+ * \param data - the pointer to a buffer
+ * \param type - the pointer to save extension type
+ * \param len - the pointer to save extension data length
+ * \return a pointer to decoded extension data
+ * \post *data = *data + mp_sizeof_ext(*len)
+ */
+MP_PROTO const char *
+mp_decode_ext(const char **data, int8_t *type, uint32_t *len);
+
+/**
  * \brief Calculate exact buffer size needed to store an integer \a num.
  * Maximum return value is 9. For performance reasons you can preallocate
  * buffer for maximum size without calling the function.
@@ -1188,6 +1263,7 @@ mp_check(const char **data, const char *end);
 extern const enum mp_type mp_type_hint[];
 extern const int8_t mp_parser_hint[];
 extern const char *mp_char2escape[];
+extern const uint8_t mp_ext_hint[];
 
 MP_IMPL MP_ALWAYSINLINE enum mp_type
 mp_typeof(const char c)
@@ -1322,6 +1398,104 @@ mp_decode_map(const char **data)
 			mp_unreachable();
 		return c & 0xf;
 	}
+}
+
+MP_IMPL uint32_t
+mp_sizeof_extl(uint32_t len)
+{
+	if (len && len <= 16 && mp_ext_hint[len-1]) return 2;
+	if (len <= UINT8_MAX) return 3;
+	if (len <= UINT16_MAX) return 4;
+	else return 6;
+}
+
+MP_IMPL uint32_t
+mp_sizeof_ext(uint32_t len)
+{
+	return mp_sizeof_extl(len) + len;
+}
+
+MP_IMPL char *
+mp_encode_extl(char *data, int8_t type, uint32_t len)
+{
+	/*
+	 * Only use fixext when length is exactly 1, 2, 4, 8 or 16.
+	 * Otherwise use ext 8 if length <= 255.
+	 */
+	if (len && len <= 16 && mp_ext_hint[len-1]) {
+		data = mp_store_u8(data, mp_ext_hint[len-1]);
+	} else if (len <= UINT8_MAX) {
+		data = mp_store_u8(data, 0xc7);
+		data = mp_store_u8(data, (uint8_t) len);
+	} else if (len <= UINT16_MAX) {
+		data = mp_store_u8(data, 0xc8);
+		data = mp_store_u16(data, (uint16_t) len);
+	} else {
+		data = mp_store_u8(data, 0xc9);
+		data = mp_store_u32(data,len);
+	}
+	data = mp_store_u8(data, type);
+	return data;
+}
+
+MP_IMPL char *
+mp_encode_ext(char *data, int8_t type, char *str, uint32_t len)
+{
+	data = mp_encode_extl(data, type, len);
+	memcpy(data, str, len);
+	return data + len;
+}
+
+MP_IMPL ptrdiff_t
+mp_check_extl(const char *cur, const char *end)
+{
+	assert(cur < end);
+	assert(mp_typeof(*cur) == MP_EXT);
+	uint8_t c = mp_load_u8(&cur);
+	if ((c & 0xf0) == 0xd0) {
+		return 1 - (end - cur);
+	}
+
+	assert(c >= 0xc7 && c <= 0xc9);
+	return (1 << (c - 0xc7)) + 1 - (end - cur); /* 0xc7 -> 2, 0xc8 -> 3, 0xc9 ->5 */
+}
+
+MP_IMPL uint32_t
+mp_decode_extl(const char **data, int8_t *type) {
+	uint8_t c = mp_load_u8(data);
+	uint32_t len;
+	switch 	 (c) {
+	case 0xd4:
+	case 0xd5:
+	case 0xd6:
+	case 0xd7:
+	case 0xd8:
+		len = 1u << (c - 0xd4);
+		break;
+	case 0xc7:
+		len = mp_load_u8(data);
+		break;
+	case 0xc8:
+		len = mp_load_u16(data);
+		break;
+	case 0xc9:
+		len = mp_load_u32(data);
+		break;
+	default:
+		mp_unreachable();
+	}
+	*type = mp_load_u8(data);
+	return len;
+}
+
+MP_IMPL const char *
+mp_decode_ext(const char **data, int8_t *type, uint32_t *len) {
+	assert(len != NULL);
+
+	*len = mp_decode_extl(data, type);
+	const char *str = *data;
+	*data += *len;
+	return str;
 }
 
 MP_IMPL uint32_t

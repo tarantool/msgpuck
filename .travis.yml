@@ -15,10 +15,12 @@ env:
       - OS=fedora DIST=27
       - OS=fedora DIST=28
       - OS=fedora DIST=29
+      - OS=fedora DIST=30
       - OS=ubuntu DIST=trusty
       - OS=ubuntu DIST=xenial
       - OS=ubuntu DIST=bionic
       - OS=ubuntu DIST=cosmic
+      - OS=ubuntu DIST=disco
       - OS=debian DIST=jessie
       - OS=debian DIST=stretch
       - OS=debian DIST=buster

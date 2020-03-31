@@ -547,7 +547,7 @@ mp_encode_extl(char *data, int8_t type, uint32_t len);
  * \sa mp_encode_strl
  */
 MP_PROTO char *
-mp_encode_ext(char *data, int8_t type, char *str, uint32_t len);
+mp_encode_ext(char *data, int8_t type, const char *str, uint32_t len);
 
 /**
  * \brief Check that \a cur buffer has enough bytes to decode an ext header.
@@ -1439,7 +1439,7 @@ mp_encode_extl(char *data, int8_t type, uint32_t len)
 }
 
 MP_IMPL char *
-mp_encode_ext(char *data, int8_t type, char *str, uint32_t len)
+mp_encode_ext(char *data, int8_t type, const char *str, uint32_t len)
 {
 	data = mp_encode_extl(data, type, len);
 	memcpy(data, str, len);

@@ -39,6 +39,7 @@
 
 #include "msgpuck.h"
 #include "test.h"
+#include "ext_tnt.h"
 
 #define BUF_MAXLEN ((1L << 18) - 1)
 #define STRBIN_MAXLEN (BUF_MAXLEN - 10)
@@ -1052,16 +1053,79 @@ test_mp_print_ext(void)
 	return check_plan();
 }
 
+static int
+test_mp_print_ext_tnt(void)
+{
+	plan(5);
+	header();
+	mp_snprint_ext = mp_snprint_ext_tnt;
+	mp_fprint_ext = mp_fprint_ext_tnt;
+
+	unsigned char mp_decimals_array[] =
+		"\xdd\x00\x00\x00\x15"       /* array */
+		"\xd5\x01\x00\x0c"           /* 0 */
+		"\xd5\x01\xfe\x0c"           /* 0e2 */
+		"\xd5\x01\x00\x1c"           /* 1 */
+		"\xd5\x01\x00\x1d"           /* -1 */
+		"\xd6\x01\x02\x01\x23\x4d"   /* -12.34 */
+		"\xd6\x01\x02\x12\x34\x5d"   /* -123.45 */
+		"\xd6\x01\x04\x10\x00\x0d"   /* -10000e-4 */
+		"\xd5\x01\x00\x1c"           /* 1e0 */
+		"\xd5\x01\x01\x1c"           /* 1e-1 */
+		"\xd5\x01\x02\x1c"           /* 1e-2 */
+		"\xc7\x03\x01\x24\x01\x0c"   /* 10e-36 */
+		"\xd5\x01\xff\x1c"           /* 1e1 */
+		"\xd5\x01\xfe\x1c"           /* 1e2 */
+		"\xd6\x01\xd0\xdc\x01\x0c"   /* 10e36 */
+		"\xc7\x03\x01\x00\x01\x2c"   /* 12e0 */
+		"\xc7\x03\x01\x01\x01\x2c"   /* 12e-1 */
+		"\xc7\x03\x01\x02\x01\x2c"   /* 12e-2 */
+		"\xc7\x03\x01\x03\x01\x2c"   /* 12e-3 */
+		"\xc7\x03\x01\xff\x01\x2c"   /* 12e1 */
+		"\xc7\x03\x01\xfe\x01\x2c"   /* 12e2 */
+		"\xc7\x03\x01\xfd\x01\x2c";  /* 12e3 */
+
+	const char expected[] =
+		"[0, 0, 1, -1, -12.34, -123.45, -1.0000, 1, 0.1, 0.01, "
+			"0.000000000000000000000000000000000010, 10, 100, "
+			"10000000000000000000000000000000000000, 12, 1.2, "
+			"0.12, 0.012, 120, 1200, 12000]";
+
+	char result[256];
+	int fsize = mp_snprint(result, sizeof(result), (const char*)mp_decimals_array);
+	ok(fsize == sizeof(expected) - 1, "mp_snprint return value");
+	ok(strcmp(result, expected) == 0, "mp_snprint result");
+
+	FILE *tmpf = tmpfile();
+	if (tmpf == NULL)
+		abort();
+	fsize = mp_fprint(tmpf, (const char*)mp_decimals_array);
+	is(fsize, sizeof(expected) - 1, "mp_fprint size match");
+	rewind(tmpf);
+	fsize = (int)fread(result, 1, sizeof(result), tmpf);
+	is(fsize, sizeof(expected) - 1, "mp_fprint written correct number of bytes");
+	result[fsize] = 0;
+	is(strcmp(result, expected), 0, "str is correct");
+	fclose(tmpf);
+
+	mp_snprint_ext = mp_snprint_ext_default;
+	mp_fprint_ext = mp_fprint_ext_default;
+	footer();
+	return check_plan();
+}
+
 int
 test_mp_check()
 {
-	plan(65);
+	plan(66);
 	header();
 
 #define invalid(data, fmt, ...) ({ \
 	const char *p = data; \
 	isnt(mp_check(&p, p + sizeof(data) - 1), 0, fmt, ## __VA_ARGS__); \
 });
+
+	invalid("\xc1", "invalid header 0xc1");
 
 	/* fixmap */
 	invalid("\x81", "invalid fixmap 1");
@@ -1309,7 +1373,7 @@ test_overflow()
 
 int main()
 {
-	plan(23);
+	plan(24);
 	test_uints();
 	test_ints();
 	test_bools();
@@ -1330,6 +1394,7 @@ int main()
 	test_format();
 	test_mp_print();
 	test_mp_print_ext();
+	test_mp_print_ext_tnt();
 	test_mp_check();
 	test_numbers();
 	test_overflow();

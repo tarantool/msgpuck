@@ -2478,6 +2478,10 @@ mp_check(const char **data, const char *end)
 	for (k = 1; k > 0; k--) {
 		MP_CHECK_LEN(1);
 		uint8_t c = mp_load_u8(data);
+
+		if (c == 0xC1)
+			return 1;
+
 		int l = mp_parser_hint[c];
 		if (mp_likely(l >= 0)) {
 			MP_CHECK_LEN(l);

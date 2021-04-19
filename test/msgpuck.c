@@ -896,7 +896,7 @@ test_mp_print()
 	const char *expected =
 		"[-5, 42, \"kill bill\", [], "
 		"{\"bool true\": true, \"bool false\": false, \"null\": null, "
-		"\"float\": 3.14, \"double\": 3.14, 100: 500}, "
+		"\"float\": 3.1400001, \"double\": 3.1400000000000001, 100: 500}, "
 		"(extension: type 123, len 3), "
 		"\"\\u0012test4\\b\\t\\n\\\"bla\\\\-bla\\\"\\f\\r\\u0000\", {}]";
 	int esize = strlen(expected);

@@ -336,10 +336,10 @@ mp_format(char *data, size_t data_size, const char *format, ...)
 		PRINTF(mp_decode_bool(data) ? "true" : "false");		\
 		break;								\
 	case MP_FLOAT:								\
-		PRINTF("%g", mp_decode_float(data));				\
+		PRINTF("%.9g", mp_decode_float(data));				\
 		break;								\
 	case MP_DOUBLE:								\
-		PRINTF("%lg", mp_decode_double(data));				\
+		PRINTF("%.17lg", mp_decode_double(data));			\
 		break;								\
 	case MP_EXT:								\
 		PRINT_EXT(data);						\

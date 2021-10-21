@@ -2377,6 +2377,46 @@ mp_next_slowpath(const char **data, int64_t k)
 		uint8_t c = mp_load_u8(data);
 		int l = mp_parser_hint[c];
 		if (mp_likely(l >= 0)) {
+			/*
+			 *  Same one-byte-encoded-value optimisation.
+			 *  Good for skipping tons of NILs, zeros etc.
+			 *  Run not more than once per 64 cycles (or about)
+			 * in order to avoid degradation for other cases.
+			 *  Note that l == 0 means that the last byte (that is
+			 * in variable `c`) is one-byte-encoded-value.
+			 *  The idea of optimization is to read the next 8 bytes
+			 * as one 8byte uint and check if all bytes of that
+			 * word are the same value (`c`). If so - skip 8 bytes
+			 * at once and repeat.
+			 *  A small trick is used to create an 8byte uint that
+			 * consists of 8 bytes that equal to one byte (`c`):
+			 * by rules of multiplication if multiply an one-byte
+			 * value (for example 0xab) by 0x0101010101010101 we
+			 * will get 0xabababababababab. That works for any byte.
+			 */
+			if (mp_unlikely(l == 0 && k % 64 == 0)) {
+				/*
+				 * Check k > 8 that there are at least 8 values
+				 * more expected, that are at least 8 bytes of
+				 * total length, that allows us to read 8 bytes.
+				 */
+				while (k > 8) {
+					const char *save = *data;
+					uint64_t u = mp_load_u64(data);
+					/*
+					 * Check that `u` is 8 `c` bytes,
+					 * see the trick explanation above.
+					 */
+					if (u != c * 0x0101010101010101ull) {
+						/* Wrong, restore pointer. */
+						*data = save;
+						break;
+					}
+					/* Confirm reading of 8 values. */
+					k -= 8;
+				}
+				continue;
+			}
 			*data += l;
 			continue;
 		} else if (mp_likely(l > MP_HINT)) {

@@ -119,17 +119,17 @@ extern "C" {
 
 #if defined(__CC_ARM)         /* set the alignment to 1 for armcc compiler */
 #define MP_PACKED    __packed
-#define MP_PACKED_END 
+#define MP_PACKED_END
 #define MP_CONST __attribute__((const))
 #define MP_PURE __attribute__((pure))
 #elif defined(__GNUC__)
 #define MP_PACKED  __attribute__((packed))
-#define MP_PACKED_END 
+#define MP_PACKED_END
 #define MP_CONST __attribute__((const))
 #define MP_PURE __attribute__((pure))
 #elif defined(_MSC_VER)
-#define MP_CONST 
-#define MP_PURE 
+#define MP_CONST
+#define MP_PURE
 #define MP_PACKED __pragma(pack(push, 1))
 #define MP_PACKED_END __pragma(pack(pop))
 #endif
@@ -890,6 +890,16 @@ mp_encode_strl(char *data, uint32_t len);
  */
 MP_PROTO char *
 mp_encode_str(char *data, const char *str, uint32_t len);
+
+/**
+ * \brief Encode a null-terminated string
+ * The function is equivalent to mp_encode_str() with len = strlen(str)
+ * \param data - a buffer
+ * \param str - a pointer to string data
+ * \return mp_encode_str(data, str, strlen(str))
+ */
+MP_PROTO char *
+mp_encode_str0(char *data, const char *str);
 
 /**
  * \brief Encode a binstring header of length \a len.
@@ -2005,6 +2015,12 @@ mp_encode_str(char *data, const char *str, uint32_t len)
 	data = mp_encode_strl(data, len);
 	memcpy(data, str, len);
 	return data + len;
+}
+
+MP_IMPL char *
+mp_encode_str0(char *data, const char *str)
+{
+	return mp_encode_str(data, str, strlen(str));
 }
 
 MP_IMPL char *

@@ -1081,6 +1081,21 @@ extern mp_snprint_ext_f mp_snprint_ext;
 int
 mp_snprint_ext_default(char *buf, int size, const char **data, int depth);
 
+typedef int (*mp_check_ext_data_f)(int8_t type, const char *data, uint32_t len);
+
+/**
+ * \brief Function called by mp_check() to validate user-defined MP_EXT types.
+ */
+extern mp_check_ext_data_f mp_check_ext_data;
+
+/**
+ * \brief Default MP_EXT checker. Does nothing since knows nothing of
+ * user-defined extension types.
+ * \retval 0
+ */
+int
+mp_check_ext_data_default(int8_t type, const char *data, uint32_t len);
+
 /**
  * \brief Check that \a cur buffer has enough bytes to decode a string header
  * \param cur buffer
@@ -2535,16 +2550,30 @@ mp_check(const char **data, const char *end)
 		MP_CHECK_LEN(1);
 		uint8_t c = mp_load_u8(data);
 		int l = mp_parser_hint[c];
+		uint32_t len;
+		int8_t type;
 		if (mp_likely(l >= 0)) {
 			MP_CHECK_LEN(l);
-			*data += l;
+			if (mp_unlikely(c >= 0xd4 && c <= 0xd8)) {
+				/*
+				 * Check MP_EXT contents. Everything but the
+				 * first byte (which stands for ext type) is the
+				 * payload.
+				 */
+				len = l - 1;
+				type = mp_load_u8(data);
+				if (mp_check_ext_data(type, *data, len) != 0)
+					return 1;
+				*data += len;
+			} else {
+				*data += l;
+			}
 			continue;
 		} else if (mp_likely(l > MP_HINT)) {
 			k -= l;
 			continue;
 		}
 
-		uint32_t len;
 		switch (l) {
 		case MP_HINT_STR_8:
 			/* MP_STR (8) */
@@ -2591,24 +2620,30 @@ mp_check(const char **data, const char *end)
 			/* MP_EXT (8) */
 			MP_CHECK_LEN(sizeof(uint8_t) + sizeof(uint8_t));
 			len = mp_load_u8(data);
-			mp_load_u8(data);
+			type = mp_load_u8(data);
 			MP_CHECK_LEN(len);
+			if (mp_check_ext_data(type, *data, len) != 0)
+				return 1;
 			*data += len;
 			break;
 		case MP_HINT_EXT_16:
 			/* MP_EXT (16) */
 			MP_CHECK_LEN(sizeof(uint16_t) + sizeof(uint8_t));
 			len = mp_load_u16(data);
-			mp_load_u8(data);
+			type = mp_load_u8(data);
 			MP_CHECK_LEN(len);
+			if (mp_check_ext_data(type, *data, len) != 0)
+				return 1;
 			*data += len;
 			break;
 		case MP_HINT_EXT_32:
 			/* MP_EXT (32) */
 			MP_CHECK_LEN(sizeof(uint32_t) + sizeof(uint8_t));
 			len = mp_load_u32(data);
-			mp_load_u8(data);
+			type = mp_load_u8(data);
 			MP_CHECK_LEN(len);
+			if (mp_check_ext_data(type, *data, len) != 0)
+				return 1;
 			*data += len;
 			break;
 		default:

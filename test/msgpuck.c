@@ -1196,6 +1196,89 @@ test_mp_check()
 	return check_plan();
 }
 
+/**
+ * Check validity of a simple extension type.
+ * Its type is 0x42 and payload is a byte string where i-th byte value is its
+ * position from the end of the string.
+ */
+int
+mp_check_ext_data_test(int8_t type, const char *data, uint32_t len)
+{
+	if (type != 0x42)
+		return 1;
+	for (uint32_t i = 0; i < len; i++) {
+		if ((unsigned char)data[i] != len - i)
+			return 1;
+	}
+	return 0;
+}
+
+int
+test_mp_check_ext_data()
+{
+	plan(24);
+	header();
+
+#define valid(data, fmt, ...) ({ \
+	const char *p = data; \
+	is(mp_check(&p, p + sizeof(data) - 1), 0, fmt, ## __VA_ARGS__); \
+})
+
+	mp_check_ext_data_f mp_check_ext_data_svp = mp_check_ext_data;
+	mp_check_ext_data = mp_check_ext_data_test;
+
+	/* ext8 */
+	invalid("\xc7\x00\x13", "invalid ext8 - bad type");
+	invalid("\xc7\x01\x42\x13", "invalid ext8 - bad data");
+	valid("\xc7\x01\x42\x01", "valid ext8");
+
+	/* ext16 */
+	invalid("\xc8\x00\x00\x13", "invalid ext16 - bad type");
+	invalid("\xc8\x00\x01\x42\x13", "invalid ext16 - bad data");
+	valid("\xc8\x00\x01\x42\x01", "valid ext16");
+
+	/* ext32 */
+	invalid("\xc9\x00\x00\x00\x00\x13", "invalid ext32 - bad type");
+	invalid("\xc9\x00\x00\x00\x01\x42\x13", "invalid ext32 - bad data");
+	valid("\xc9\x00\x00\x00\x01\x42\x01", "valid ext32");
+
+	/* fixext8 */
+	invalid("\xd4\x13\x01", "invalid fixext8 - bad type");
+	invalid("\xd4\x42\x13", "invalid fixext8 - bad data");
+	valid("\xd4\x42\x01", "valid fixext8");
+
+	/* fixext16 */
+	invalid("\xd5\x13\x02\x01", "invalid fixext16 - bad type");
+	invalid("\xd5\x42\x13\x13", "invalid fixext16 - bad data");
+	valid("\xd5\x42\x02\x01", "valid fixext16");
+
+	/* fixext32 */
+	invalid("\xd6\x13\x04\x03\x02\x01", "invalid fixext32 - bad type");
+	invalid("\xd6\x42\x13\x13\x13\x13", "invalid fixext32 - bad data");
+	valid("\xd6\x42\x04\x03\x02\x01", "valid fixext32");
+
+	/* fixext64 */
+	invalid("\xd7\x13\x08\x07\x06\x05\x04\x03\x02\x01",
+		"invalid fixext64 - bad type");
+	invalid("\xd7\x42\x13\x13\x13\x13\x13\x13\x13\x13",
+		"invalid fixext64 - bad data");
+	valid("\xd7\x42\x08\x07\x06\x05\x04\x03\x02\x01",
+	      "valid fixext64");
+
+	/* fixext128 */
+	invalid("\xd8\x13\x10\x0f\x0e\x0d\x0c\x0b\x0a\x09\x08\x07\x06\x05\x04"
+		"\x03\x02\x01", "invalid fixext128 - bad type");
+	invalid("\xd8\x42\x13\x13\x13\x13\x13\x13\x13\x13\x13\x13\x13\x13\x13"
+		"\x13\x13\x13", "invalid fixext128 - bad data");
+	valid("\xd8\x42\x10\x0f\x0e\x0d\x0c\x0b\x0a\x09\x08\x07\x06\x05\x04"
+	      "\x03\x02\x01", "valid fixext128");
+
+	mp_check_ext_data = mp_check_ext_data_svp;
+
+	footer();
+	return check_plan();
+}
+
 #define int_eq(a, b) (((a) - (b)) == 0)
 #define double_eq(a, b) (fabs((a) - (b)) < 1e-15)
 
@@ -1316,7 +1399,7 @@ test_overflow()
 
 int main()
 {
-	plan(23);
+	plan(24);
 	test_uints();
 	test_ints();
 	test_bools();
@@ -1338,6 +1421,7 @@ int main()
 	test_mp_print();
 	test_mp_print_ext();
 	test_mp_check();
+	test_mp_check_ext_data();
 	test_numbers();
 	test_overflow();
 

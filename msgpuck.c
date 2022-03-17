@@ -59,6 +59,17 @@ mp_fprint_ext_f mp_fprint_ext = mp_fprint_ext_default;
 
 mp_snprint_ext_f mp_snprint_ext = mp_snprint_ext_default;
 
+int
+mp_check_ext_data_default(int8_t type, const char *data, uint32_t len)
+{
+	(void)data;
+	(void)type;
+	(void)len;
+	return 0;
+}
+
+mp_check_ext_data_f mp_check_ext_data = mp_check_ext_data_default;
+
 size_t
 mp_vformat(char *data, size_t data_size, const char *format, va_list vl)
 {

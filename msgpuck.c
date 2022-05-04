@@ -415,3 +415,14 @@ mp_snprint(char *buf, int size, const char *data)
 {
 	return mp_snprint_recursion(buf, size, &data, MP_PRINT_MAX_DEPTH);
 }
+
+static const char escaped_slash[] = "\\/";
+
+void
+msgpuck_json_esc_slash_toggle(bool value)
+{
+        if (value)
+                mp_char2escape['/'] = (char*)escaped_slash;
+        else
+                mp_char2escape['/'] = NULL;
+}

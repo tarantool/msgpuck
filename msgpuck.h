@@ -1484,8 +1484,10 @@ mp_frame_advance(struct mp_frame *frame);
 /** \cond false */
 extern const enum mp_type mp_type_hint[];
 extern const int8_t mp_parser_hint[];
-extern const char *mp_char2escape[];
+extern char *mp_char2escape[];
 extern const uint8_t mp_ext_hint[];
+
+void msgpuck_json_esc_slash_toggle(bool value);
 
 MP_IMPL MP_ALWAYSINLINE enum mp_type
 mp_typeof(const char c)

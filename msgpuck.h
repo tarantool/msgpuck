@@ -2395,7 +2395,8 @@ enum {
 	MP_HINT_MAP_32 = MP_HINT - 6,
 	MP_HINT_EXT_8 = MP_HINT - 7,
 	MP_HINT_EXT_16 = MP_HINT - 8,
-	MP_HINT_EXT_32 = MP_HINT - 9
+	MP_HINT_EXT_32 = MP_HINT - 9,
+	MP_HINT_INVALID = MP_HINT - 10
 };
 
 MP_PROTO void
@@ -2646,6 +2647,8 @@ mp_check(const char **data, const char *end)
 				return 1;
 			*data += len;
 			break;
+		case MP_HINT_INVALID:
+			return 1;
 		default:
 			mp_unreachable();
 		}

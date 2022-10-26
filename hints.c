@@ -554,7 +554,7 @@ const int8_t mp_parser_hint[256] = {
 
 	/* {{{ MP_NIL, MP_BOOL */
 	/* 0xc0 */ 0, /* MP_NIL */
-	/* 0xc1 */ 0, /* never used */
+	/* 0xc1 */ MP_HINT_INVALID, /* never used */
 	/* 0xc2 */ 0, /* MP_BOOL*/
 	/* 0xc3 */ 0, /* MP_BOOL*/
 	/* }}} */

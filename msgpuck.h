@@ -2483,11 +2483,11 @@ mp_next_slowpath(const char **data, int64_t k)
 			break;
 		case MP_HINT_MAP_16:
 			/* MP_MAP (16) */
-			k += 2 * mp_load_u16(data);
+			k += 2 * (uint32_t)mp_load_u16(data);
 			break;
 		case MP_HINT_MAP_32:
 			/* MP_MAP (32) */
-			k += 2 * mp_load_u32(data);
+			k += 2 * (uint64_t)mp_load_u32(data);
 			break;
 		case MP_HINT_EXT_8:
 			/* MP_EXT (8) */
@@ -2610,12 +2610,12 @@ mp_check(const char **data, const char *end)
 		case MP_HINT_MAP_16:
 			/* MP_MAP (16) */
 			MP_CHECK_LEN(sizeof(uint16_t));
-			k += 2 * mp_load_u16(data);
+			k += 2 * (uint32_t)mp_load_u16(data);
 			break;
 		case MP_HINT_MAP_32:
 			/* MP_MAP (32) */
 			MP_CHECK_LEN(sizeof(uint32_t));
-			k += 2 * mp_load_u32(data);
+			k += 2 * (uint64_t)mp_load_u32(data);
 			break;
 		case MP_HINT_EXT_8:
 			/* MP_EXT (8) */

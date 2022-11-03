@@ -1055,7 +1055,7 @@ test_mp_print_ext(void)
 int
 test_mp_check()
 {
-	plan(69);
+	plan(71);
 	header();
 
 #define invalid(data, fmt, ...) ({ \
@@ -1184,12 +1184,14 @@ test_mp_check()
 	/* map16 */
 	invalid("\xde", "invalid map16 1");
 	invalid("\xde\x00\x01", "invalid map16 2");
-	invalid("\xde\x00\x01\x5", "invalid map16 2");
+	invalid("\xde\x00\x01\x5", "invalid map16 3");
+	invalid("\xde\x80\x00", "invalid map16 4");
 
 	/* map32 */
 	invalid("\xdf", "invalid map32 1");
 	invalid("\xdf\x00\x00\x00\x01", "invalid map32 2");
 	invalid("\xdf\x00\x00\x00\x01\x5", "invalid map32 3");
+	invalid("\xdf\x80\x00\x00\x00", "invalid map32 4");
 
 	/* 0xc1 is never used */
 	invalid("\xc1", "invalid header 1");

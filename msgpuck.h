@@ -1499,7 +1499,7 @@ mp_frame_advance(struct mp_frame *frame);
 /** \cond false */
 extern const enum mp_type mp_type_hint[];
 extern const int8_t mp_parser_hint[];
-extern const char *mp_char2escape[];
+extern const char *const mp_char2escape[];
 extern const uint8_t mp_ext_hint[];
 
 MP_IMPL MP_ALWAYSINLINE enum mp_type

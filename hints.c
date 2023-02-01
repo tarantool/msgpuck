@@ -650,7 +650,7 @@ const int8_t mp_parser_hint[256] = {
 	/* }}} */
 };
 
-const char *mp_char2escape[128] = {
+const char *const mp_char2escape[128] = {
 	"\\u0000", "\\u0001", "\\u0002", "\\u0003",
 	"\\u0004", "\\u0005", "\\u0006", "\\u0007",
 	"\\b", "\\t", "\\n", "\\u000b",

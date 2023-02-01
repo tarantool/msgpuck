@@ -660,7 +660,7 @@ const char *mp_char2escape[128] = {
 	"\\u0018", "\\u0019", "\\u001a", "\\u001b",
 	"\\u001c", "\\u001d", "\\u001e", "\\u001f",
 	NULL, NULL, "\\\"", NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, "\\/",
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,

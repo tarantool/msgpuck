@@ -868,7 +868,7 @@ test_mp_print()
 	d = mp_encode_array(d, 8);
 	d = mp_encode_int(d, -5);
 	d = mp_encode_uint(d, 42);
-	d = mp_encode_str(d, "kill bill", 9);
+	d = mp_encode_str(d, "kill/bill", 9);
 	d = mp_encode_array(d, 0);
 	d = mp_encode_map(d, 6);
 	d = mp_encode_str(d, "bool true", 9);
@@ -893,7 +893,7 @@ test_mp_print()
 	assert(d <= msgpack + sizeof(msgpack));
 
 	const char *expected =
-		"[-5, 42, \"kill bill\", [], "
+		"[-5, 42, \"kill/bill\", [], "
 		"{\"bool true\": true, \"bool false\": false, \"null\": null, "
 		"\"float\": 3.14, \"double\": 3.14, 100: 500}, "
 		"(extension: type 123, len 3), "

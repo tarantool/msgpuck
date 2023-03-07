@@ -438,6 +438,56 @@ MP_PROTO char *
 mp_encode_array(char *data, uint32_t size);
 
 /**
+ * \brief Encode an array header of \a size elements to a buffer
+ * \a data of size \a data_sz checking for overflow.
+ *
+ * Encode an array header of \a size elements to a buffer
+ * \a data of size \a data_sz checking for overflow.
+ *
+ * If \a data_sz == NULL then it is equivalent to \link mp_encode_array()
+ * mp_encode_array() \endlink.
+ *
+ * Otherwise if header size fits into the buffer then it is written and
+ * \a data_sz is decreased by the header size.
+ *
+ * Otherwise if header size does not fit into the buffer it is not written
+ * but \a data_sz is still decreased by the header size.
+ *
+ * NOTE that in future the implementation of the last case can be changed
+ * to truncating header instead of skipping or to something else.
+ *
+ * All array members must be encoded after the header.
+ *
+ * Example usage:
+ * \code
+ *
+ * // Calculate required space:
+ * ptrdiff_t len = 0;
+ * mp_encode_array_safe(NULL, &len, 2)
+ * mp_encode_uint_safe(NULL, &len, 10)
+ * mp_encode_uint_safe(NULL, &len, 10)
+ *
+ * // Allocate space
+ * char *p = malloc(-len);
+ *
+ * // Encode
+ * p = mp_encode_array_safe(p, NULL, 2)
+ * p = mp_encode_uint_safe(p, NULL, 10)
+ * p = mp_encode_uint_safe(p, NULL, 10)
+ * \endcode
+ *
+ * Given the code structure is same when calculating required space and
+ * when encoding one can put it into a function and avoid code duplication.
+ *
+ * \param data - a buffer
+ * \param data_sz - a pointer to the size of the buffer
+ * \param size - a number of elements
+ * \return \a data updated to the position after written header
+ */
+MP_PROTO char *
+mp_encode_array_safe(char *data, ptrdiff_t *data_sz, uint32_t size);
+
+/**
  * \brief Check that \a cur buffer has enough bytes to decode an array header
  * \param cur buffer
  * \param end end of the buffer
@@ -509,6 +559,22 @@ MP_PROTO char *
 mp_encode_map(char *data, uint32_t size);
 
 /**
+ * \brief Encode a map header of \a size elements to a buffer
+ * \a data of size \a data_sz checking for overflow.
+ *
+ * All map key-value pairs must be encoded after the header.
+ *
+ * \param data - a buffer
+ * \param data_sz - a pointer to the size of the buffer
+ * \param size - a number of key/value pairs
+ * \return \a data updated to the position after written header
+ * \sa \link mp_encode_array_safe() An usage example and documentation details
+ * \endlink
+ */
+MP_PROTO char *
+mp_encode_map_safe(char *data, ptrdiff_t *data_sz, uint32_t size);
+
+/**
  * \brief Check that \a cur buffer has enough bytes to decode a map header
  * \param cur buffer
  * \param end end of the buffer
@@ -559,8 +625,27 @@ MP_PROTO char *
 mp_encode_extl(char *data, int8_t type, uint32_t len);
 
 /**
+ * \brief Encode extension header with \a type and value length \a len
+ * to a buffer \a data of size \a data_sz checking for overflow.
+ *
+ * The value must be encoded after the header.
+ *
+ * \param data - a buffer
+ * \param data_sz - a pointer to the size of the buffer
+ * \param type - extension type
+ * \param len - lenght of the extension data
+ * \return \a data updated to the position after written header
+ * \sa \link mp_encode_array_safe() An usage example and documentation details
+ * \endlink
+ */
+MP_PROTO char *
+mp_encode_extl_safe(char *data, ptrdiff_t *data_sz, int8_t type, uint32_t len);
+
+/**
  * \brief Encode extension data of length \a len.
+ *
  * The function is equivalent to mp_encode_extl() + memcpy.
+ *
  * \param data - a buffer
  * \param type - extension type to encode
  * \param str - a pointer to extension data
@@ -571,6 +656,23 @@ mp_encode_extl(char *data, int8_t type, uint32_t len);
  */
 MP_PROTO char *
 mp_encode_ext(char *data, int8_t type, const char *str, uint32_t len);
+
+/**
+ * \brief Encode extension data \a str of length \a len with type \a type
+ * to a buffer \a data of size \a data_sz checking for overflow.
+ *
+ * \param data - a buffer
+ * \param data_sz - a pointer to the size of the buffer
+ * \param type - extension type to encode
+ * \param str - a pointer to extension data
+ * \param len - a extension data length
+ * \return \a data updated to the position after written extension payload.
+ * \sa \link mp_encode_array_safe() An usage example and documentation details
+ * \endlink
+ */
+MP_PROTO char *
+mp_encode_ext_safe(char *data, ptrdiff_t *data_sz,
+		   int8_t type, const char *str, uint32_t len);
 
 /**
  * \brief Check that \a cur buffer has enough bytes to decode an ext header.
@@ -649,6 +751,20 @@ MP_PROTO char *
 mp_encode_uint(char *data, uint64_t num);
 
 /**
+ * \brief Encode an unsigned integer \a num to a buffer \a data
+ * of size \a data_sz checking for overflow.
+ *
+ * \param data - a buffer
+ * \param data_sz - a pointer to the size of the buffer
+ * \param num - a number
+ * \return \a data updated to the position after written value
+ * \sa \link mp_encode_array_safe() An usage example and documentation details
+ * \endlink
+ */
+MP_PROTO char *
+mp_encode_uint_safe(char *data, ptrdiff_t *data_sz, uint64_t num);
+
+/**
  * \brief Encode a signed integer \a num.
  * It is your responsibility to ensure that \a data has enough space.
  * \param data - a buffer
@@ -660,6 +776,20 @@ mp_encode_uint(char *data, uint64_t num);
  */
 MP_PROTO char *
 mp_encode_int(char *data, int64_t num);
+
+/**
+ * \brief Encode a signed integer \a num to a buffer \a data
+ * of size \a data_sz checking for overflow.
+ *
+ * \param data - a buffer
+ * \param data_sz - a pointer to the size of the buffer
+ * \param num - a number
+ * \return \a data updated to the position after written value
+ * \sa \link mp_encode_array_safe() An usage example and documentation details
+ * \endlink
+ */
+MP_PROTO char *
+mp_encode_int_safe(char *data, ptrdiff_t *data_sz, int64_t num);
 
 /**
  * \brief Check that \a cur buffer has enough bytes to decode an uint
@@ -750,6 +880,20 @@ MP_PROTO char *
 mp_encode_float(char *data, float num);
 
 /**
+ * \brief Encode a float \a num to a buffer \a data
+ * of size \a data_sz checking for overflow.
+ *
+ * \param data - a buffer
+ * \param data_sz - a pointer to the size of the buffer
+ * \param num - a float
+ * \return \a data updated to the position after written value
+ * \sa \link mp_encode_array_safe() An usage example and documentation details
+ * \endlink
+ */
+MP_PROTO char *
+mp_encode_float_safe(char *data, ptrdiff_t *data_sz, float num);
+
+/**
  * \brief Encode a double \a num.
  * It is your responsibility to ensure that \a data has enough space.
  * \param data - a buffer
@@ -760,6 +904,20 @@ mp_encode_float(char *data, float num);
  */
 MP_PROTO char *
 mp_encode_double(char *data, double num);
+
+/**
+ * \brief Encode a double \a num to a buffer \a data
+ * of size \a data_sz checking for overflow.
+ *
+ * \param data - a buffer
+ * \param data_sz - a pointer to the size of the buffer
+ * \param num - a number
+ * \return \a data updated to the position after written value
+ * \sa \link mp_encode_array_safe() An usage example and documentation details
+ * \endlink
+ */
+MP_PROTO char *
+mp_encode_double_safe(char *data, ptrdiff_t *data_sz, double num);
 
 /**
  * \brief Check that \a cur buffer has enough bytes to decode a float
@@ -879,6 +1037,20 @@ MP_PROTO char *
 mp_encode_strl(char *data, uint32_t len);
 
 /**
+ * \brief Encode a string header of length \a len to a buffer
+ * \a data of size \a data_sz checking for overflow.
+ *
+ * \param data - a buffer
+ * \param data_sz - a pointer to the size of the buffer
+ * \param len - a string length
+ * \return \a data updated to the position after written header
+ * \sa \link mp_encode_array_safe() An usage example and documentation details
+ * \endlink
+ */
+MP_PROTO char *
+mp_encode_strl_safe(char *data, ptrdiff_t *data_sz, uint32_t len);
+
+/**
  * \brief Encode a string of length \a len.
  * The function is equivalent to mp_encode_strl() + memcpy.
  * \param data - a buffer
@@ -892,6 +1064,22 @@ MP_PROTO char *
 mp_encode_str(char *data, const char *str, uint32_t len);
 
 /**
+ * \brief Encode a string \a str of length \a len to a buffer \a data
+ * of size \a data_sz checking for overflow.
+ *
+ * \param data - a buffer
+ * \param data_sz - a pointer to the size of the buffer
+ * \param str - a pointer to string data
+ * \param len - a string length
+ * \return \a data updated to the position after written string payload
+ * \sa \link mp_encode_array_safe() An usage example and documentation details
+ * \endlink
+ */
+MP_PROTO char *
+mp_encode_str_safe(char *data, ptrdiff_t *data_sz,
+		   const char *str, uint32_t len);
+
+/**
  * \brief Encode a null-terminated string
  * The function is equivalent to mp_encode_str() with len = strlen(str)
  * \param data - a buffer
@@ -900,6 +1088,20 @@ mp_encode_str(char *data, const char *str, uint32_t len);
  */
 MP_PROTO char *
 mp_encode_str0(char *data, const char *str);
+
+/**
+ * \brief Encode a null-terminated string \a str to a buffer \a data
+ * of size \a data_sz checking for overflow.
+ *
+ * \param data - a buffer
+ * \param data_sz - a pointer to the size of the buffer
+ * \param str - a pointer to string data
+ * \return \a data updated to the position after written string payload
+ * \sa \link mp_encode_array_safe() An usage example and documentation details
+ * \endlink
+ */
+MP_PROTO char *
+mp_encode_str0_safe(char *data, ptrdiff_t *data_sz, const char *str);
 
 /**
  * \brief Encode a binstring header of length \a len.
@@ -913,6 +1115,20 @@ MP_PROTO char *
 mp_encode_binl(char *data, uint32_t len);
 
 /**
+ * \brief Encode a binstring header of length \a len to a buffer
+ * \a data of size \a data_sz checking for overflow.
+ *
+ * \param data - a buffer
+ * \param data_sz - a pointer to the size of the buffer
+ * \param len - a string length
+ * \return \a data updated to the position after written header
+ * \sa \link mp_encode_array_safe() An usage example and documentation details
+ * \endlink
+ */
+MP_PROTO char *
+mp_encode_binl_safe(char *data, ptrdiff_t *data_sz, uint32_t len);
+
+/**
  * \brief Encode a binstring of length \a len.
  * The function is equivalent to mp_encode_binl() + memcpy.
  * \param data - a buffer
@@ -924,6 +1140,22 @@ mp_encode_binl(char *data, uint32_t len);
  */
 MP_PROTO char *
 mp_encode_bin(char *data, const char *str, uint32_t len);
+
+/**
+ * \brief Encode a binstring \a str of length \a len to a buffer \a data
+ * of size \a data_sz checking for overflow.
+ *
+ * \param data - a buffer
+ * \param data_sz - a pointer to the size of the buffer
+ * \param str - a pointer to binstring data
+ * \param len - a binstring length
+ * \return \a data updated to the position after written binstring payload
+ * \sa \link mp_encode_array_safe() An usage example and documentation details
+ * \endlink
+ */
+MP_PROTO char *
+mp_encode_bin_safe(char *data, ptrdiff_t *data_sz,
+		   const char *str, uint32_t len);
 
 /**
  * \brief Encode a sequence of values according to format string.
@@ -1204,6 +1436,19 @@ MP_PROTO char *
 mp_encode_nil(char *data);
 
 /**
+ * \brief Encode the nil value to a buffer \a data of size \a data_sz
+ * checking for overflow.
+ *
+ * \param data - a buffer
+ * \param data_sz - a pointer to the size of the buffer
+ * \return \a data updated to the position after written value
+ * \sa \link mp_encode_array_safe() An usage example and documentation details
+ * \endlink
+ */
+MP_PROTO char *
+mp_encode_nil_safe(char *data, ptrdiff_t *data_sz);
+
+/**
  * \brief Check that \a cur buffer has enough bytes to decode nil
  * \param cur buffer
  * \param end end of the buffer
@@ -1243,6 +1488,20 @@ mp_sizeof_bool(bool val);
  */
 MP_PROTO char *
 mp_encode_bool(char *data, bool val);
+
+/**
+ * \brief Encode a bool value \a val to a buffer \a data
+ * of size \a data_sz checking for overflow.
+ *
+ * \param data - a buffer
+ * \param data_sz - a pointer to the size of the buffer
+ * \param val - a bool
+ * \return \a data updated to the position after written value
+ * \sa \link mp_encode_array_safe() An usage example and documentation details
+ * \endlink
+ */
+MP_PROTO char *
+mp_encode_bool_safe(char *data, ptrdiff_t *data_sz, bool val);
 
 /**
  * \brief Check that \a cur buffer has enough bytes to decode a bool value
@@ -1535,6 +1794,17 @@ mp_encode_array(char *data, uint32_t size)
 	}
 }
 
+MP_IMPL char *
+mp_encode_array_safe(char *data, ptrdiff_t *data_sz, uint32_t size)
+{
+	if (data_sz != NULL) {
+		*data_sz -= mp_sizeof_array(size);
+		if (*data_sz < 0)
+			return data;
+	}
+	return mp_encode_array(data, size);
+}
+
 MP_IMPL ptrdiff_t
 mp_check_array(const char *cur, const char *end)
 {
@@ -1607,6 +1877,17 @@ mp_encode_map(char *data, uint32_t size)
 	}
 }
 
+MP_IMPL char *
+mp_encode_map_safe(char *data, ptrdiff_t *data_sz, uint32_t size)
+{
+	if (data_sz != NULL) {
+		*data_sz -= mp_sizeof_map(size);
+		if (*data_sz < 0)
+			return data;
+	}
+	return mp_encode_map(data, size);
+}
+
 MP_IMPL ptrdiff_t
 mp_check_map(const char *cur, const char *end)
 {
@@ -1676,11 +1957,34 @@ mp_encode_extl(char *data, int8_t type, uint32_t len)
 }
 
 MP_IMPL char *
+mp_encode_extl_safe(char *data, ptrdiff_t *data_sz, int8_t type, uint32_t len)
+{
+	if (data_sz != NULL) {
+		*data_sz -= mp_sizeof_extl(len);
+		if (*data_sz < 0)
+			return data;
+	}
+	return mp_encode_extl(data, type, len);
+}
+
+MP_IMPL char *
 mp_encode_ext(char *data, int8_t type, const char *str, uint32_t len)
 {
 	data = mp_encode_extl(data, type, len);
 	memcpy(data, str, len);
 	return data + len;
+}
+
+MP_IMPL char *
+mp_encode_ext_safe(char *data, ptrdiff_t *data_sz,
+		   int8_t type, const char *str, uint32_t len)
+{
+	if (data_sz != NULL) {
+		*data_sz -= mp_sizeof_ext(len);
+		if (*data_sz < 0)
+			return data;
+	}
+	return mp_encode_ext(data, type, str, len);
 }
 
 MP_IMPL ptrdiff_t
@@ -1807,6 +2111,17 @@ mp_encode_uint(char *data, uint64_t num)
 }
 
 MP_IMPL char *
+mp_encode_uint_safe(char *data, ptrdiff_t *data_sz, uint64_t num)
+{
+	if (data_sz != NULL) {
+		*data_sz -= mp_sizeof_uint(num);
+		if (*data_sz < 0)
+			return data;
+	}
+	return mp_encode_uint(data, num);
+}
+
+MP_IMPL char *
 mp_encode_int(char *data, int64_t num)
 {
 	assert(num < 0);
@@ -1825,6 +2140,17 @@ mp_encode_int(char *data, int64_t num)
 		data = mp_store_u8(data, 0xd3);
 		return mp_store_u64(data, num);
 	}
+}
+
+MP_IMPL char *
+mp_encode_int_safe(char *data, ptrdiff_t *data_sz, int64_t num)
+{
+	if (data_sz != NULL) {
+		*data_sz -= mp_sizeof_int(num);
+		if (*data_sz < 0)
+			return data;
+	}
+	return mp_encode_int(data, num);
 }
 
 MP_IMPL uint64_t
@@ -1945,10 +2271,32 @@ mp_encode_float(char *data, float num)
 }
 
 MP_IMPL char *
+mp_encode_float_safe(char *data, ptrdiff_t *data_sz, float num)
+{
+	if (data_sz != NULL) {
+		*data_sz -= mp_sizeof_float(num);
+		if (*data_sz < 0)
+			return data;
+	}
+	return mp_encode_float(data, num);
+}
+
+MP_IMPL char *
 mp_encode_double(char *data, double num)
 {
 	data = mp_store_u8(data, 0xcb);
 	return mp_store_double(data, num);
+}
+
+MP_IMPL char *
+mp_encode_double_safe(char *data, ptrdiff_t *data_sz, double num)
+{
+	if (data_sz != NULL) {
+		*data_sz -= mp_sizeof_double(num);
+		if (*data_sz < 0)
+			return data;
+	}
+	return mp_encode_double(data, num);
 }
 
 MP_IMPL float
@@ -2025,6 +2373,17 @@ mp_encode_strl(char *data, uint32_t len)
 }
 
 MP_IMPL char *
+mp_encode_strl_safe(char *data, ptrdiff_t *data_sz, uint32_t len)
+{
+	if (data_sz != NULL) {
+		*data_sz -= mp_sizeof_strl(len);
+		if (*data_sz < 0)
+			return data;
+	}
+	return mp_encode_strl(data, len);
+}
+
+MP_IMPL char *
 mp_encode_str(char *data, const char *str, uint32_t len)
 {
 	data = mp_encode_strl(data, len);
@@ -2033,9 +2392,27 @@ mp_encode_str(char *data, const char *str, uint32_t len)
 }
 
 MP_IMPL char *
+mp_encode_str_safe(char *data, ptrdiff_t *data_sz,
+		   const char *str, uint32_t len)
+{
+	if (data_sz != NULL) {
+		*data_sz -= mp_sizeof_str(len);
+		if (*data_sz < 0)
+			return data;
+	}
+	return mp_encode_str(data, str, len);
+}
+
+MP_IMPL char *
 mp_encode_str0(char *data, const char *str)
 {
 	return mp_encode_str(data, str, strlen(str));
+}
+
+MP_IMPL char *
+mp_encode_str0_safe(char *data, ptrdiff_t *data_sz, const char *str)
+{
+	return mp_encode_str_safe(data, data_sz, str, strlen(str));
 }
 
 MP_IMPL char *
@@ -2054,11 +2431,34 @@ mp_encode_binl(char *data, uint32_t len)
 }
 
 MP_IMPL char *
+mp_encode_binl_safe(char *data, ptrdiff_t *data_sz, uint32_t len)
+{
+	if (data_sz != NULL) {
+		*data_sz -= mp_sizeof_binl(len);
+		if (*data_sz < 0)
+			return data;
+	}
+	return mp_encode_binl(data, len);
+}
+
+MP_IMPL char *
 mp_encode_bin(char *data, const char *str, uint32_t len)
 {
 	data = mp_encode_binl(data, len);
 	memcpy(data, str, len);
 	return data + len;
+}
+
+MP_IMPL char *
+mp_encode_bin_safe(char *data, ptrdiff_t *data_sz,
+		   const char *str, uint32_t len)
+{
+	if (data_sz != NULL) {
+		*data_sz -= mp_sizeof_bin(len);
+		if (*data_sz < 0)
+			return data;
+	}
+	return mp_encode_bin(data, str, len);
 }
 
 MP_IMPL ptrdiff_t
@@ -2193,6 +2593,17 @@ mp_encode_nil(char *data)
 	return mp_store_u8(data, 0xc0);
 }
 
+MP_IMPL char *
+mp_encode_nil_safe(char *data, ptrdiff_t *data_sz)
+{
+	if (data_sz != NULL) {
+		*data_sz -= mp_sizeof_nil();
+		if (*data_sz < 0)
+			return data;
+	}
+	return mp_encode_nil(data);
+}
+
 MP_IMPL ptrdiff_t
 mp_check_nil(const char *cur, const char *end)
 {
@@ -2220,6 +2631,17 @@ MP_IMPL char *
 mp_encode_bool(char *data, bool val)
 {
 	return mp_store_u8(data, 0xc2 | (val & 1));
+}
+
+MP_IMPL char *
+mp_encode_bool_safe(char *data, ptrdiff_t *data_sz, bool val)
+{
+	if (data_sz != NULL) {
+		*data_sz -= mp_sizeof_bool(val);
+		if (*data_sz < 0)
+			return data;
+	}
+	return mp_encode_bool(data, val);
 }
 
 MP_IMPL ptrdiff_t

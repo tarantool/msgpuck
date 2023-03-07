@@ -120,10 +120,91 @@ static char *data = buf + 1; /* use unaligned address to fail early */
 #define test_bin(...)    DEFINE_TEST_STRBINEXT(bin, SCALAR, COMPLEX, __VA_ARGS__)
 #define test_ext(...)	 DEFINE_TEST_STRBINEXT(ext, COMPLEX, SCALAR, __VA_ARGS__)
 
+#define DEFINE_TEST_SAFE(_type, _complex, _ext, _v, _r, _rl) ({		       \
+	note(""#_type"_safe");						       \
+	_ext(int8_t ext_type = 0);					       \
+	ptrdiff_t sz;							       \
+	const char *d;							       \
+	/* Test calculating size. */					       \
+	sz = 0;								       \
+	d = mp_encode_##_type##_safe(NULL, &sz, _ext(ext_type COMMA) (_v));    \
+	is(-sz, (_rl), "size after mp_encode_"#_type"_safe(NULL, &sz)");       \
+	is(d, NULL, "mp_encode_"#_type"_safe(NULL, &sz)");		       \
+	/* Test encoding with no overflow. */				       \
+	sz = _rl;							       \
+	d = mp_encode_##_type##_safe(data, &sz, _ext(ext_type COMMA) (_v));    \
+	is(sz, 0, "size after mp_encode_"#_type"_safe(buf, &sz)");	       \
+	is((d - data), (_rl), "len of mp_encode_"#_type"_safe(buf, &sz)");     \
+	is(memcmp(data, (_r), (_rl)), 0, "mp_encode_"#_type"_safe(buf, &sz)"); \
+	/* Test encoding with with overflow. */				       \
+	sz = _rl - 1;							       \
+	d = mp_encode_##_type##_safe(data, &sz, _ext(ext_type COMMA) (_v));    \
+	is(sz, -1, "size after mp_encode_"#_type"_safe(buf, &sz) overflow");   \
+	is(d, data, "mp_encode_"#_type"_safe(buf, &sz) overflow");	       \
+	/* Test encoding with sz == NULL. */				       \
+	d = mp_encode_##_type##_safe(data, NULL, _ext(ext_type COMMA) (_v));   \
+	is((d - data), (_rl), "len of mp_encode_"#_type"_safe(buf, NULL)");    \
+	is(memcmp(data, (_r), (_rl)), 0, "mp_encode_"#_type"_safe(buf, NULL)");\
+	})
+
+#define DEFINE_TEST_STRBINEXT_SAFE(_type, _not_ext, _ext, _vl) ({	       \
+	note(""#_type"_safe");						       \
+	_ext(int8_t ext_type = 0);					       \
+	ptrdiff_t sz;							       \
+	const ptrdiff_t hl = mp_sizeof_##_type##l(_vl);			       \
+	const ptrdiff_t rl = hl + _vl;					       \
+	char head[5];							       \
+	const char *d;							       \
+	for (uint32_t i = 0; i < _vl; i++) {				       \
+		str[i] = 'a' + i % 26;					       \
+	}								       \
+	mp_encode_##_type##l(head,_ext(ext_type COMMA) _vl);		       \
+	/* Test calculating size. */					       \
+	sz = 0;								       \
+	d = mp_encode_##_type##_safe(NULL, &sz, _ext(ext_type COMMA) str, _vl);\
+	is(-sz, rl, "size after mp_encode_"#_type"_safe(NULL, &sz)");	       \
+	is(d, NULL, "mp_encode_"#_type"_safe(NULL, &sz)");		       \
+	/* Test encoding with no overflow. */				       \
+	sz = rl;							       \
+	d = mp_encode_##_type##_safe(data, &sz, _ext(ext_type COMMA) str, _vl);\
+	is(sz, 0, "size after mp_encode_"#_type"_safe(buf, &sz)");	       \
+	is((d - data), rl, "len of mp_encode_"#_type"_safe(buf, &sz)");	       \
+	is(memcmp(data, head, hl), 0,					       \
+	   "head of mp_encode_"#_type"_safe(buf, &sz)");		       \
+	is(memcmp(data + hl, str, (_vl)), 0,				       \
+	   "payload of mp_encode_"#_type"_safe(buf, &sz)");		       \
+	/* Test encoding with with overflow. */				       \
+	sz = rl - 1;							       \
+	d = mp_encode_##_type##_safe(data, &sz, _ext(ext_type COMMA) str, _vl);\
+	is(sz, -1, "size after mp_encode_"#_type"_safe(buf, &sz) overflow");   \
+	is(d, data, "mp_encode_"#_type"_safe(buf, &sz) overflow");	       \
+	/* Test encoding with sz == NULL. */				       \
+	d = mp_encode_##_type##_safe(data, NULL, _ext(ext_type COMMA)str, _vl);\
+	is((d - data), rl, "len of mp_encode_"#_type"_safe(buf, NULL)");       \
+	is(memcmp(data, head, hl), 0,					       \
+	   "head of mp_encode_"#_type"_safe(buf, NULL)");		       \
+	is(memcmp(data + hl, str, (_vl)), 0,				       \
+	   "payload of mp_encode_"#_type"_safe(buf, NULL)");		       \
+	})
+
+#define test_uint_safe(...)   DEFINE_TEST_SAFE(uint, SCALAR, COMPLEX, __VA_ARGS__)
+#define test_int_safe(...)    DEFINE_TEST_SAFE(int, SCALAR, COMPLEX, __VA_ARGS__)
+#define test_bool_safe(...)   DEFINE_TEST_SAFE(bool, SCALAR, COMPLEX, __VA_ARGS__)
+#define test_float_safe(...)  DEFINE_TEST_SAFE(float, SCALAR, COMPLEX, __VA_ARGS__)
+#define test_double_safe(...) DEFINE_TEST_SAFE(double, SCALAR, COMPLEX, __VA_ARGS__)
+#define test_strl_safe(...)   DEFINE_TEST_SAFE(strl, COMPLEX, COMPLEX, __VA_ARGS__)
+#define test_binl_safe(...)   DEFINE_TEST_SAFE(binl, COMPLEX, COMPLEX, __VA_ARGS__)
+#define test_extl_safe(...)   DEFINE_TEST_SAFE(extl, COMPLEX, SCALAR, __VA_ARGS__)
+#define test_array_safe(...)  DEFINE_TEST_SAFE(array, COMPLEX, COMPLEX, __VA_ARGS__)
+#define test_map_safe(...)    DEFINE_TEST_SAFE(map, COMPLEX, COMPLEX, __VA_ARGS__)
+#define test_str_safe(...)    DEFINE_TEST_STRBINEXT_SAFE(str, SCALAR, COMPLEX, __VA_ARGS__)
+#define test_bin_safe(...)    DEFINE_TEST_STRBINEXT_SAFE(bin, SCALAR, COMPLEX, __VA_ARGS__)
+#define test_ext_safe(...)    DEFINE_TEST_STRBINEXT_SAFE(ext, COMPLEX, SCALAR, __VA_ARGS__)
+
 static int
 test_uints(void)
 {
-	plan(135);
+	plan(15*9 + 9);
 	header();
 
 	test_uint(0U, "\x00", 1);
@@ -149,6 +230,8 @@ test_uints(void)
 	test_uint(0xffffffffffffffffULL,
 	     "\xcf\xff\xff\xff\xff\xff\xff\xff\xff", 9);
 
+	test_uint_safe(0xfffeU, "\xcd\xff\xfe", 3);
+
 	footer();
 	return check_plan();
 }
@@ -156,7 +239,7 @@ test_uints(void)
 static int
 test_ints(void)
 {
-	plan(153);
+	plan(17*9 + 9);
 	header();
 
 	test_int(-0x01, "\xff", 1);
@@ -185,6 +268,8 @@ test_ints(void)
 	test_int((int64_t)-0x8000000000000000LL,
 	     "\xd3\x80\x00\x00\x00\x00\x00\x00\x00", 9);
 
+	test_int_safe(-0x80000000LL, "\xd2\x80\x00\x00\x00", 5);
+
 	footer();
 	return check_plan();
 }
@@ -192,11 +277,13 @@ test_ints(void)
 static int
 test_bools(void)
 {
-	plan(18);
+	plan(2*9 + 9);
 	header();
 
 	test_bool(true, "\xc3", 1);
 	test_bool(false, "\xc2", 1);
+
+	test_bool_safe(true, "\xc3", 1);
 
 	footer();
 	return check_plan();
@@ -205,12 +292,14 @@ test_bools(void)
 static int
 test_floats(void)
 {
-	plan(27);
+	plan(3*9 + 9);
 	header();
 
 	test_float((float) 1.0, "\xca\x3f\x80\x00\x00", 5);
 	test_float((float) 3.141593, "\xca\x40\x49\x0f\xdc", 5);
 	test_float((float) -1e38f, "\xca\xfe\x96\x76\x99", 5);
+
+	test_float_safe((float) 3.141593, "\xca\x40\x49\x0f\xdc", 5);
 
 	footer();
 	return check_plan();
@@ -219,7 +308,7 @@ test_floats(void)
 static int
 test_doubles(void)
 {
-	plan(27);
+	plan(3*9 + 9);
 	header();
 
 	test_double((double) 1.0,
@@ -229,6 +318,9 @@ test_doubles(void)
 	test_double((double) -1e99,
 		    "\xcb\xd4\x7d\x42\xae\xa2\x87\x9f\x2e", 9);
 
+	test_double_safe((double) 3.141592653589793,
+			 "\xcb\x40\x09\x21\xfb\x54\x44\x2d\x18", 9);
+
 	footer();
 	return check_plan();
 }
@@ -236,7 +328,7 @@ test_doubles(void)
 static int
 test_nils(void)
 {
-	plan(6);
+	plan(15);
 	header();
 
 	const char *d1 = mp_encode_nil(data);
@@ -253,6 +345,26 @@ test_nils(void)
 	is(d1, d4, "len(mp_check_nil()) == 1");
 	is(mp_sizeof_nil(), 1, "mp_sizeof_nil() == 1");
 
+	ptrdiff_t sz = 0;
+	d1 = mp_encode_nil_safe(NULL, &sz);
+	is(-sz, 1, "size after mp_encode_nil_safe(NULL, &sz)");
+	is(d1, NULL, "mp_encode_nil_safe(NULL, &sz)");
+
+	sz = 1;
+	d1 = mp_encode_nil_safe(data, &sz);
+	is(sz, 0, "size after mp_encode_nil_safe(buf, &sz)");
+	is(d1 - data, 1, "len of mp_encode_nil_safe(buf, &sz)");
+	is((unsigned char)data[0], 0xc0, "mp_encode_nil_safe(buf, &sz)");
+
+	sz = 0;
+	d1 = mp_encode_nil_safe(data, &sz);
+	is(sz, -1, "size after mp_encode_nil_safe(buf, &sz) overflow");
+	is(d1, data, "mp_encode_nil_safe(buf, &sz) overflow");
+
+	d1 = mp_encode_nil_safe(data, NULL);
+	is(d1 - data, 1, "len of mp_encode_nil_safe(buf, NULL)");
+	is((unsigned char)data[0], 0xc0, "mp_encode_nil_safe(buf, NULL)");
+
 	footer();
 	return check_plan();
 }
@@ -260,7 +372,7 @@ test_nils(void)
 static int
 test_arrays(void)
 {
-	plan(54);
+	plan(9*6 + 9);
 	header();
 
 	test_array(0, "\x90", 1);
@@ -273,6 +385,8 @@ test_arrays(void)
 	test_array(0xfffffffeU, "\xdd\xff\xff\xff\xfe", 5);
 	test_array(0xffffffffU, "\xdd\xff\xff\xff\xff", 5);
 
+	test_array_safe(0xffff, "\xdc\xff\xff", 3);
+
 	footer();
 	return check_plan();
 }
@@ -280,7 +394,7 @@ test_arrays(void)
 static int
 test_maps(void)
 {
-	plan(54);
+	plan(9*6 + 9);
 	header();
 
 	test_map(0, "\x80", 1);
@@ -293,6 +407,8 @@ test_maps(void)
 	test_map(0xfffffffeU, "\xdf\xff\xff\xff\xfe", 5);
 	test_map(0xffffffffU, "\xdf\xff\xff\xff\xff", 5);
 
+	test_map_safe(0xfffffffeU, "\xdf\xff\xff\xff\xfe", 5);
+
 	footer();
 	return check_plan();
 }
@@ -300,7 +416,7 @@ test_maps(void)
 static int
 test_strls(void)
 {
-	plan(78);
+	plan(13*6 + 9);
 	header();
 
 	test_strl(0x00U, "\xa0", 1);
@@ -320,6 +436,8 @@ test_strls(void)
 	test_strl(0xfffffffeU, "\xdb\xff\xff\xff\xfe", 5);
 	test_strl(0xffffffffU, "\xdb\xff\xff\xff\xff", 5);
 
+	test_strl_safe(0x20U, "\xd9\x20", 2);
+
 	footer();
 	return check_plan();
 }
@@ -327,7 +445,7 @@ test_strls(void)
 static int
 test_binls(void)
 {
-	plan(78);
+	plan(13*6 + 9);
 	header();
 
 	test_binl(0x00U, "\xc4\x00", 2);
@@ -347,6 +465,8 @@ test_binls(void)
 	test_binl(0xfffffffeU, "\xc6\xff\xff\xff\xfe", 5);
 	test_binl(0xffffffffU, "\xc6\xff\xff\xff\xff", 5);
 
+	test_binl_safe(0x00010000U, "\xc6\x00\x01\x00\x00", 5);
+
 	footer();
 	return check_plan();
 }
@@ -354,7 +474,7 @@ test_binls(void)
 static int
 test_extls(void)
 {
-	plan(168);
+	plan(28*6 + 9);
 	header();
 
 	/* fixext 1,2,4,8,16 */
@@ -394,6 +514,8 @@ test_extls(void)
 	test_extl(0xfffffffeU, "\xc9\xff\xff\xff\xfe\x00", 6);
 	test_extl(0xffffffffU, "\xc9\xff\xff\xff\xff\x00", 6);
 
+	test_extl_safe(0x0aU, "\xc7\x0a\x00", 3);
+
 	footer();
 	return check_plan();
 }
@@ -401,7 +523,7 @@ test_extls(void)
 static int
 test_strs(void)
 {
-	plan(96);
+	plan(12*8 + 11);
 	header();
 
 	test_str(0x01);
@@ -417,6 +539,8 @@ test_strs(void)
 	test_str(0x10000);
 	test_str(0x10001);
 
+	test_str_safe(0xfffe);
+
 	footer();
 	return check_plan();
 }
@@ -424,7 +548,7 @@ test_strs(void)
 static int
 test_bins(void)
 {
-	plan(96);
+	plan(12*8 + 11);
 	header();
 
 	test_bin(0x01);
@@ -440,6 +564,8 @@ test_bins(void)
 	test_bin(0x10000);
 	test_bin(0x10001);
 
+	test_bin_safe(0x10001);
+
 	footer();
 	return check_plan();
 }
@@ -447,7 +573,7 @@ test_bins(void)
 static int
 test_exts(void)
 {
-	plan(225);
+	plan(25*9 + 11);
 	header();
 
 	test_ext(0x01);
@@ -478,6 +604,8 @@ test_exts(void)
 
 	test_ext(0x00010000);
 	test_ext(0x00010001);
+
+	test_ext_safe(0xfe);
 
 	footer();
 	return check_plan();

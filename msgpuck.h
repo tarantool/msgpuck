@@ -644,7 +644,7 @@ mp_encode_extl_safe(char *data, ptrdiff_t *data_sz, int8_t type, uint32_t len);
 /**
  * \brief Encode extension data of length \a len.
  *
- * The function is equivalent to mp_encode_extl() + memcpy.
+ * The function is equivalent to mp_encode_extl() + mp_memcpy().
  *
  * \param data - a buffer
  * \param type - extension type to encode
@@ -1015,14 +1015,11 @@ mp_sizeof_bin(uint32_t len);
  * char *b = buffer;
  * b = mp_encode_strl(b, hdr.total_len);
  * char *s = b;
- * memcpy(b, pkt1.data, pkt1.len);
- * b += pkt1.len;
+ * b = mp_memcpy(b, pkt1.data, pkt1.len);
  * // get next packet
- * memcpy(b, pkt2.data, pkt2.len);
- * b += pkt2.len;
+ * b = mp_memcpy(b, pkt2.data, pkt2.len);
  * // get next packet
- * memcpy(b, pkt1.data, pkt3.len);
- * b += pkt3.len;
+ * b = mp_memcpy(b, pkt1.data, pkt3.len);
  *
  * // Check that all data was received
  * assert(hdr.total_len == (uint32_t) (b - s))
@@ -1052,7 +1049,7 @@ mp_encode_strl_safe(char *data, ptrdiff_t *data_sz, uint32_t len);
 
 /**
  * \brief Encode a string of length \a len.
- * The function is equivalent to mp_encode_strl() + memcpy.
+ * The function is equivalent to mp_encode_strl() + mp_memcpy().
  * \param data - a buffer
  * \param str - a pointer to string data
  * \param len - a string length
@@ -1130,7 +1127,7 @@ mp_encode_binl_safe(char *data, ptrdiff_t *data_sz, uint32_t len);
 
 /**
  * \brief Encode a binstring of length \a len.
- * The function is equivalent to mp_encode_binl() + memcpy.
+ * The function is equivalent to mp_encode_binl() + mp_memcpy().
  * \param data - a buffer
  * \param str - a pointer to binstring data
  * \param len - a binstring length
@@ -1523,6 +1520,34 @@ mp_check_bool(const char *cur, const char *end);
  */
 MP_PROTO bool
 mp_decode_bool(const char **data);
+
+/**
+ * \brief Copy payload \a str of length \a len to a buffer \a data.
+ *
+ * Copy data just as memcpy do but additionally return updated
+ * buffer pointer.
+ *
+ * \param data - a buffer
+ * \param str - a pointer to payload
+ * \param len - a payload length
+ * \return \a data updated to the position after written payload
+ */
+MP_PROTO char *
+mp_memcpy(char *data, const char *str, uint32_t len);
+
+/**
+ * \brief Copy payload \a str of length \a len to a buffer \a data of size
+ * \a data_sz checking for overflow.
+ *
+ * \param data - a buffer
+ * \param data_sz - a pointer to the size of the buffer
+ * \param str - a pointer to payload
+ * \param len - a payload length
+ * \return \a data updated to the position after written payload
+ * \sa \link mp_encode_array_safe() Documentation details \endlink
+ */
+MP_PROTO char *
+mp_memcpy_safe(char *data, ptrdiff_t *data_sz, const char *str, uint32_t len);
 
 /**
  * \brief Decode an integer value as int32_t from MsgPack \a data.
@@ -1971,8 +1996,7 @@ MP_IMPL char *
 mp_encode_ext(char *data, int8_t type, const char *str, uint32_t len)
 {
 	data = mp_encode_extl(data, type, len);
-	memcpy(data, str, len);
-	return data + len;
+	return mp_memcpy(data, str, len);
 }
 
 MP_IMPL char *
@@ -2317,6 +2341,24 @@ mp_decode_double(const char **data)
 	return mp_load_double(data);
 }
 
+MP_IMPL char *
+mp_memcpy(char *data, const char *str, uint32_t len)
+{
+	memcpy(data, str, len);
+	return data + len;
+}
+
+MP_PROTO char *
+mp_memcpy_safe(char *data, ptrdiff_t *data_sz, const char *str, uint32_t len)
+{
+	if (data_sz != NULL) {
+		*data_sz -= len;
+		if (*data_sz < 0)
+			return data;
+	}
+	return mp_memcpy(data, str, len);
+}
+
 MP_IMPL uint32_t
 mp_sizeof_strl(uint32_t len)
 {
@@ -2387,8 +2429,7 @@ MP_IMPL char *
 mp_encode_str(char *data, const char *str, uint32_t len)
 {
 	data = mp_encode_strl(data, len);
-	memcpy(data, str, len);
-	return data + len;
+	return mp_memcpy(data, str, len);
 }
 
 MP_IMPL char *
@@ -2445,8 +2486,7 @@ MP_IMPL char *
 mp_encode_bin(char *data, const char *str, uint32_t len)
 {
 	data = mp_encode_binl(data, len);
-	memcpy(data, str, len);
-	return data + len;
+	return mp_memcpy(data, str, len);
 }
 
 MP_IMPL char *

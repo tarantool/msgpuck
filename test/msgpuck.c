@@ -611,6 +611,46 @@ test_exts(void)
 	return check_plan();
 }
 
+static int
+test_memcpy()
+{
+	plan(11);
+	header();
+
+	int len = 27;
+	char *d;
+
+	for (int i = 0; i < len; i++)
+		str[i] = 'a' + i % 26;
+
+	d = mp_memcpy(data, str, len);
+	is(d - data, len, "len of mp_memcpy()");
+	is(memcmp(data, str, len), 0, "payload of mp_memcpy()");
+
+	ptrdiff_t sz = 0;
+	d = mp_memcpy_safe(NULL, &sz, str, len);
+	is(-sz, len, "size after mp_memcpy_safe(NULL, &sz)");
+	is(d, NULL, "mp_memcpy_safe(NULL, &sz)");
+
+	sz = len;
+	d = mp_memcpy_safe(data, &sz, str, len);
+	is(sz, 0, "size after mp_memcpy_safe(buf, &sz)");
+	is(d - data, len, "len of mp_memcpy_safe(buf, &sz)");
+	is(memcmp(data, str, len), 0, "mp_memcpy_safe(buf, &sz)");
+
+	sz = len - 1;
+	d = mp_memcpy_safe(data, &sz, str, len);
+	is(sz, -1, "size after mp_memcpy_safe(buf, &sz) overflow");
+	is(d, data, "mp_memcpy_safe(buf, &sz) overflow");
+
+	d = mp_memcpy_safe(data, NULL, str, len);
+	is(d - data, len, "len of (buf, NULL)");
+	is(memcmp(data, str, len), 0, "mp_memcpy_safe(buf, NULL)");
+
+	footer();
+	return check_plan();
+}
+
 static void
 test_next_on_array(uint32_t count)
 {
@@ -1535,7 +1575,7 @@ test_overflow()
 
 int main()
 {
-	plan(24);
+	plan(25);
 	test_uints();
 	test_ints();
 	test_bools();
@@ -1550,6 +1590,7 @@ int main()
 	test_exts();
 	test_arrays();
 	test_maps();
+	test_memcpy();
 	test_next_on_arrays();
 	test_next_on_maps();
 	test_compare_uints();

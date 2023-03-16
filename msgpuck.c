@@ -142,13 +142,14 @@ mp_vformat(char *data, size_t data_size, const char *format, va_list vl)
 			f++;
 			assert(f[0]);
 			int64_t int_value = 0;
+			uint64_t uint_value = 0;
 			int int_status = 0; /* 1 - signed, 2 - unsigned */
 
 			if (f[0] == 'd' || f[0] == 'i') {
 				int_value = va_arg(vl, int);
 				int_status = 1;
 			} else if (f[0] == 'u') {
-				int_value = va_arg(vl, unsigned int);
+				uint_value = va_arg(vl, unsigned int);
 				int_status = 2;
 			} else if (f[0] == 's') {
 				const char *str = va_arg(vl, const char *);
@@ -205,7 +206,7 @@ mp_vformat(char *data, size_t data_size, const char *format, va_list vl)
 				int_status = 1;
 				f++;
 			} else if (f[0] == 'l' && f[1] == 'u') {
-				int_value = va_arg(vl, unsigned long);
+				uint_value = va_arg(vl, unsigned long);
 				int_status = 2;
 				f++;
 			} else if (f[0] == 'l' && f[1] == 'l'
@@ -214,7 +215,7 @@ mp_vformat(char *data, size_t data_size, const char *format, va_list vl)
 				int_status = 1;
 				f += 2;
 			} else if (f[0] == 'l' && f[1] == 'l' && f[2] == 'u') {
-				int_value = va_arg(vl, unsigned long long);
+				uint_value = va_arg(vl, unsigned long long);
 				int_status = 2;
 				f += 2;
 			} else if (f[0] == 'h'
@@ -223,7 +224,7 @@ mp_vformat(char *data, size_t data_size, const char *format, va_list vl)
 				int_status = 1;
 				f++;
 			} else if (f[0] == 'h' && f[1] == 'u') {
-				int_value = va_arg(vl, unsigned int);
+				uint_value = va_arg(vl, unsigned int);
 				int_status = 2;
 				f++;
 			} else if (f[0] == 'h' && f[1] == 'h'
@@ -232,7 +233,7 @@ mp_vformat(char *data, size_t data_size, const char *format, va_list vl)
 				int_status = 1;
 				f += 2;
 			} else if (f[0] == 'h' && f[1] == 'h' && f[2] == 'u') {
-				int_value = va_arg(vl, unsigned int);
+				uint_value = va_arg(vl, unsigned int);
 				int_status = 2;
 				f += 2;
 			} else if (f[0] != '%') {
@@ -240,14 +241,18 @@ mp_vformat(char *data, size_t data_size, const char *format, va_list vl)
 				assert(false);
 			}
 
-			if (int_status == 1 && int_value < 0) {
+			if (int_status == 1 && int_value >= 0) {
+				uint_value = int_value;
+				int_status = 2;
+			}
+			if (int_status == 1) {
 				result += mp_sizeof_int(int_value);
 				if (result <= data_size)
 					data = mp_encode_int(data, int_value);
 			} else if(int_status) {
-				result += mp_sizeof_uint(int_value);
+				result += mp_sizeof_uint(uint_value);
 				if (result <= data_size)
-					data = mp_encode_uint(data, int_value);
+					data = mp_encode_uint(data, uint_value);
 			}
 		} else if (f[0] == 'N' && f[1] == 'I' && f[2] == 'L') {
 			result += mp_sizeof_nil();

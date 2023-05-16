@@ -1584,6 +1584,16 @@ MP_PROTO int
 mp_read_double(const char **data, double *ret);
 
 /**
+ * \brief Check if a value from MsgPack \a data is loselessly convertible
+ *        to double. Pretends to be faster than just checking result of
+ *        `mp_read_double(&buf, &dummy)` (to be measured).
+ * \param data - the pointer to a buffer
+ * \retval true if the value is convertible, false otherwise.
+ */
+MP_PROTO bool
+mp_is_loselessly_convertible_to_double(const char *data);
+
+/**
  * \brief Skip one element in a packed \a data.
  *
  * The function is faster than mp_typeof + mp_decode_XXX() combination.
@@ -2843,6 +2853,44 @@ mp_read_double(const char **data, double *ret)
 	}
 	*data = p;
 	return 0;
+}
+
+MP_IMPL bool
+mp_is_loselessly_convertible_to_double(const char *data)
+{
+	int64_t ival;
+	uint64_t uval;
+	double val;
+	const char *p = data;
+	uint8_t c = mp_load_u8(&p);
+	switch (c) {
+	case 0xca: /* float */
+	case 0xcb: /* double */
+	case 0xd0: /* int8_t */
+	case 0xd1: /* int16_t */
+	case 0xd2: /* int32_t */
+	case 0xcc: /* uint8_t */
+	case 0xcd: /* uint16_t */
+	case 0xce: /* uint32_t */
+		return true;
+	case 0xd3:
+		ival = (int64_t)mp_load_u64(&p);
+		val = (double)ival;
+		if (mp_unlikely((int64_t)val != ival))
+			return false;
+		return true;
+	case 0xcf:
+		uval = mp_load_u64(&p);
+		val = (double)uval;
+		if (mp_unlikely((uint64_t)val != uval))
+			return false;
+		return true;
+	default:
+		if (mp_unlikely(c < 0xe0 && c > 0x7f))
+			return false;
+		return true;
+	}
+	mp_unreachable();
 }
 
 /** See mp_parser_hint */

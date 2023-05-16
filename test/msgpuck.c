@@ -1476,12 +1476,18 @@ test_mp_check_ext_data()
 
 #define test_read_int32(...)	test_read_number(mp_read_int32, int_eq, int32_t, __VA_ARGS__)
 #define test_read_int64(...)	test_read_number(mp_read_int64, int_eq, int64_t, __VA_ARGS__)
-#define test_read_double(...)	test_read_number(mp_read_double, double_eq, double, __VA_ARGS__)
+
+#define test_read_double(_mp_type, _val, _success) do {					\
+	mp_encode_##_mp_type(data, _val);						\
+	is(mp_can_read_double(data), _success, "mp_can_read_double(%s) gives %s",	\
+	   #_val, #_success);								\
+	test_read_number(mp_read_double, double_eq, double, _mp_type, _val, _success);	\
+} while (0)
 
 static int
 test_numbers()
 {
-	plan(96);
+	plan(109);
 	header();
 
 	test_read_int32(uint, 123, true);

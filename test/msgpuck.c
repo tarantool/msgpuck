@@ -1474,14 +1474,15 @@ test_mp_check_ext_data()
 	}								\
 } while (0)
 
-#define test_read_int32(...)	test_read_number(mp_read_int32, int_eq, int32_t, __VA_ARGS__)
-#define test_read_int64(...)	test_read_number(mp_read_int64, int_eq, int64_t, __VA_ARGS__)
-#define test_read_double(...)	test_read_number(mp_read_double, double_eq, double, __VA_ARGS__)
+#define test_read_int32(...)        test_read_number(mp_read_int32, int_eq, int32_t, __VA_ARGS__)
+#define test_read_int64(...)        test_read_number(mp_read_int64, int_eq, int64_t, __VA_ARGS__)
+#define test_read_double(...)       test_read_number(mp_read_double, double_eq, double, __VA_ARGS__)
+#define test_read_double_lossy(...) test_read_number(mp_read_double_lossy, double_eq, double, __VA_ARGS__)
 
 static int
 test_numbers()
 {
-	plan(96);
+	plan(134);
 	header();
 
 	test_read_int32(uint, 123, true);
@@ -1522,6 +1523,20 @@ test_numbers()
 	test_read_double(float, 6.565e6, true);
 	test_read_double(double, -5.555, true);
 	test_read_double(strl, 100, false);
+
+	test_read_double_lossy(uint, 123, true);
+	test_read_double_lossy(uint, 12345, true);
+	test_read_double_lossy(uint, 123456789, true);
+	test_read_double_lossy(uint, 1234567890000ULL, true);
+	test_read_double_lossy(uint, 123456789123456789ULL, true);
+	test_read_double_lossy(int, -123, true);
+	test_read_double_lossy(int, -12345, true);
+	test_read_double_lossy(int, -123456789, true);
+	test_read_double_lossy(int, -1234567890000LL, true);
+	test_read_double_lossy(int, -123456789123456789LL, true);
+	test_read_double_lossy(float, 6.565e6, true);
+	test_read_double_lossy(double, -5.555, true);
+	test_read_double_lossy(strl, 100, false);
 
 	footer();
 	return check_plan();

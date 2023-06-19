@@ -1584,6 +1584,19 @@ MP_PROTO int
 mp_read_double(const char **data, double *ret);
 
 /**
+ * \brief Decode a floating point value as double from MsgPack \a data. Unlike
+ *        mp_read_double does not fail if the result can't be stored in double
+ *        without loss of precision.
+ * \param data - the pointer to a buffer
+ * \param[out] ret - the pointer to save a result
+ * \retval  0 on success
+ * \retval -1 if underlying mp type is not MP_INT, MP_UINT,
+ *            MP_FLOAT, or MP_DOUBLE
+ */
+MP_PROTO int
+mp_read_double_lossy(const char **data, double *ret);
+
+/**
  * \brief Skip one element in a packed \a data.
  *
  * The function is faster than mp_typeof + mp_decode_XXX() combination.
@@ -2788,8 +2801,11 @@ mp_read_int64(const char **data, int64_t *ret)
 	return 0;
 }
 
+MP_PROTO int
+mp_read_double_impl(const char **data, double *ret, bool may_lose_precision);
+
 MP_IMPL int
-mp_read_double(const char **data, double *ret)
+mp_read_double_impl(const char **data, double *ret, bool may_lose_precision)
 {
 	int64_t ival;
 	uint64_t uval;
@@ -2809,7 +2825,7 @@ mp_read_double(const char **data, double *ret)
 	case 0xd3:
 		ival = (int64_t) mp_load_u64(&p);
 		val = (double) ival;
-		if ((int64_t)val != ival)
+		if (!may_lose_precision && (int64_t)val != ival)
 			return -1;
 		*ret = val;
 		break;
@@ -2825,7 +2841,7 @@ mp_read_double(const char **data, double *ret)
 	case 0xcf:
 		uval = mp_load_u64(&p);
 		val = (double)uval;
-		if ((uint64_t)val != uval)
+		if (!may_lose_precision && (uint64_t)val != uval)
 			return -1;
 		*ret = val;
 		break;
@@ -2843,6 +2859,18 @@ mp_read_double(const char **data, double *ret)
 	}
 	*data = p;
 	return 0;
+}
+
+MP_IMPL int
+mp_read_double(const char **data, double *ret)
+{
+	return mp_read_double_impl(data, ret, false);
+}
+
+MP_IMPL int
+mp_read_double_lossy(const char **data, double *ret)
+{
+	return mp_read_double_impl(data, ret, true);
 }
 
 /** See mp_parser_hint */

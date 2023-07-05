@@ -1467,7 +1467,7 @@ test_mp_check_ext_data()
 	if (_success) {							\
 		is(ret, 0, "%s check success", s);			\
 		is(d1, d2, "%s check pos advanced", s);			\
-		ok(_eq(v, _val), "%s check result", s);		\
+		ok(_eq(v, (_type)_val), "%s check result", s);		\
 	} else {							\
 		is(ret, -1, "%s check fail", s);			\
 		is(d1, data, "%s check pos unchanged", s);		\

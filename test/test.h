@@ -49,8 +49,6 @@
 		return check_plan();	// print resume
 	}
 @endcode
-
-
 */
 
 /* private function, use ok(...) instead */
@@ -58,6 +56,18 @@ int __ok(int condition, const char *fmt, ...);
 
 /* private function, use note(...) or diag(...) instead */
 void __space(FILE *stream);
+
+#define header()					\
+	do {						\
+		__space(stdout);			\
+		printf("# *** %s ***\n", __func__);	\
+	} while (0)
+
+#define footer()					\
+	do {						\
+		__space(stdout);			\
+		printf("# *** %s: done ***\n", __func__); \
+	} while (0)
 
 #define msg(stream, ...) ({ __space(stream); fprintf(stream, "# ");            \
 	fprintf(stream, __VA_ARGS__); fprintf(stream, "\n"); })
@@ -115,9 +125,4 @@ int check_plan(void);
 	}						\
 }
 
-#define fail(fmt, args...)		\
-	ok(0, fmt, ##args)
-
-
 #endif /* TEST_H_INCLUDED */
-

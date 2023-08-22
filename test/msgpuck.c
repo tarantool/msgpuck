@@ -47,9 +47,6 @@ static char buf[BUF_MAXLEN + 1];
 static char str[STRBIN_MAXLEN];
 static char *data = buf + 1; /* use unaligned address to fail early */
 
-#define header() note("*** %s ***", __func__)
-#define footer() note("*** %s: done ***", __func__)
-
 #define SCALAR(x) x
 #define COMPLEX(x)
 
@@ -1591,6 +1588,8 @@ test_overflow()
 int main()
 {
 	plan(25);
+	header();
+
 	test_uints();
 	test_ints();
 	test_bools();
@@ -1617,5 +1616,6 @@ int main()
 	test_numbers();
 	test_overflow();
 
+	footer();
 	return check_plan();
 }

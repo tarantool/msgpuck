@@ -1657,6 +1657,50 @@ mp_read_double_lossy(const char **data, double *ret);
 MP_PROTO void
 mp_next(const char **data);
 
+/** mp_check() error type. */
+enum mp_check_error_type {
+	/** Truncated MsgPack data. */
+	MP_CHECK_ERROR_TRUNC,
+	/** Illegal MsgPack code. */
+	MP_CHECK_ERROR_ILL,
+	/** MsgPack extension check failed. */
+	MP_CHECK_ERROR_EXT,
+};
+
+/** mp_check() error info. */
+struct mp_check_error {
+	/** Error type. */
+	enum mp_check_error_type type;
+	/** Start of the checked MsgPack data. */
+	const char *data;
+	/** End of the checked MsgPack data. */
+	const char *end;
+	/** Position where mp_check() failed. */
+	const char *pos;
+	/**
+	 * Number of missing MsgPack values.
+	 * Relevant only if the type is MP_CHECK_ERROR_TRUNC.
+	 */
+	int64_t trunc_count;
+	/**
+	 * Type of the MsgPack extension that failed the check.
+	 * Relevant only if the type is MP_CHECK_ERROR_EXT.
+	 */
+	int8_t ext_type;
+	/**
+	 * Length of the MsgPack extension that failed the check.
+	 * Relevant only if the type is MP_CHECK_ERROR_EXT.
+	 */
+	uint32_t ext_len;
+};
+
+typedef void (*mp_check_on_error_f)(const struct mp_check_error *err);
+
+/**
+ * \brief Function called by mp_check() on error.
+ */
+extern mp_check_on_error_f mp_check_on_error;
+
 /**
  * \brief Equivalent to mp_next() but also validates MsgPack in \a data.
  * \param data - the pointer to a buffer
@@ -3032,12 +3076,36 @@ mp_next(const char **data)
 MP_IMPL int
 mp_check(const char **data, const char *end)
 {
-#define MP_CHECK_LEN(_l) \
-	if (mp_unlikely((size_t)(end - *data) < (size_t)(_l))) \
-		return 1;
+	const char *begin = *data;
+
+#define MP_CHECK_LEN(_l)						\
+	if (mp_unlikely((size_t)(end - *data) < (size_t)(_l))) {	\
+		struct mp_check_error err;				\
+		err.type = MP_CHECK_ERROR_TRUNC;			\
+		err.data = begin;					\
+		err.end = end;						\
+		err.pos = pos;						\
+		err.trunc_count = k;					\
+		mp_check_on_error(&err);				\
+		return 1;						\
+	}
+
+#define MP_CHECK_EXT(_type, _data, _len)				\
+	if (mp_check_ext_data((_type), (_data), (_len)) != 0) {		\
+		struct mp_check_error err;				\
+		err.type = MP_CHECK_ERROR_EXT;				\
+		err.data = begin;					\
+		err.end = end;						\
+		err.pos = (_data);					\
+		err.ext_type = (_type);					\
+		err.ext_len = (_len);					\
+		mp_check_on_error(&err);				\
+		return 1;						\
+	}
 
 	int64_t k;
 	for (k = 1; k > 0; k--) {
+		const char *pos = *data;
 		MP_CHECK_LEN(1);
 		uint8_t c = mp_load_u8(data);
 		int l = mp_parser_hint[c];
@@ -3053,8 +3121,7 @@ mp_check(const char **data, const char *end)
 				 */
 				len = l - 1;
 				type = mp_load_u8(data);
-				if (mp_check_ext_data(type, *data, len) != 0)
-					return 1;
+				MP_CHECK_EXT(type, *data, len);
 				*data += len;
 			} else {
 				*data += l;
@@ -3113,8 +3180,7 @@ mp_check(const char **data, const char *end)
 			len = mp_load_u8(data);
 			type = mp_load_u8(data);
 			MP_CHECK_LEN(len);
-			if (mp_check_ext_data(type, *data, len) != 0)
-				return 1;
+			MP_CHECK_EXT(type, *data, len);
 			*data += len;
 			break;
 		case MP_HINT_EXT_16:
@@ -3123,8 +3189,7 @@ mp_check(const char **data, const char *end)
 			len = mp_load_u16(data);
 			type = mp_load_u8(data);
 			MP_CHECK_LEN(len);
-			if (mp_check_ext_data(type, *data, len) != 0)
-				return 1;
+			MP_CHECK_EXT(type, *data, len);
 			*data += len;
 			break;
 		case MP_HINT_EXT_32:
@@ -3133,12 +3198,19 @@ mp_check(const char **data, const char *end)
 			len = mp_load_u32(data);
 			type = mp_load_u8(data);
 			MP_CHECK_LEN(len);
-			if (mp_check_ext_data(type, *data, len) != 0)
-				return 1;
+			MP_CHECK_EXT(type, *data, len);
 			*data += len;
 			break;
 		case MP_HINT_INVALID:
+		{
+			struct mp_check_error err;
+			err.type = MP_CHECK_ERROR_ILL;
+			err.data = begin;
+			err.end = end;
+			err.pos = pos;
+			mp_check_on_error(&err);
 			return 1;
+		}
 		default:
 			mp_unreachable();
 		}
@@ -3146,6 +3218,7 @@ mp_check(const char **data, const char *end)
 
 	assert(*data <= end);
 #undef MP_CHECK_LEN
+#undef MP_CHECK_EXT
 	return 0;
 }
 

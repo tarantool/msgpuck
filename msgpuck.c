@@ -70,6 +70,14 @@ mp_check_ext_data_default(int8_t type, const char *data, uint32_t len)
 
 mp_check_ext_data_f mp_check_ext_data = mp_check_ext_data_default;
 
+static void
+mp_check_on_error_default(const struct mp_check_error *err)
+{
+	(void)err;
+}
+
+mp_check_on_error_f mp_check_on_error = mp_check_on_error_default;
+
 size_t
 mp_vformat(char *data, size_t data_size, const char *format, va_list vl)
 {

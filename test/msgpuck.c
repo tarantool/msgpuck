@@ -1452,6 +1452,120 @@ test_mp_check_ext_data()
 	return check_plan();
 }
 
+static struct mp_check_error last_error;
+
+static void
+mp_check_on_error_test(const struct mp_check_error *err)
+{
+	last_error = *err;
+}
+
+static int
+test_mp_check_error(void)
+{
+	const int trunc_error_count = 30;
+	const int ill_error_count = 3;
+	const int ext_error_count = 4;
+	plan(6 * trunc_error_count + 5 * ill_error_count + 7 * ext_error_count);
+	header();
+
+	mp_check_ext_data_f mp_check_ext_data_svp = mp_check_ext_data;
+	mp_check_ext_data = mp_check_ext_data_test;
+	mp_check_on_error_f mp_check_on_error_svp = mp_check_on_error;
+	mp_check_on_error = mp_check_on_error_test;
+
+#define check_error(data_, offset_, type_, trunc_count_,		\
+		    ext_type_, ext_len_, msg_)				\
+	do {			\
+		const char *data = data_;				\
+		const char *end = data + sizeof(data_) - 1;		\
+		const char *p = data;					\
+		isnt(mp_check(&p, end), 0, msg_);			\
+		is(last_error.type, type_, msg_ " - error type");	\
+		is(last_error.data, data, msg_ " - error data");	\
+		is(last_error.end, end, msg_ " - error data end");	\
+		is(last_error.pos - last_error.data, (ptrdiff_t)offset_,\
+		   msg_ " - error data pos");				\
+		if (last_error.type == MP_CHECK_ERROR_TRUNC) {		\
+			is(last_error.trunc_count, trunc_count_,	\
+			   msg_ " - error trunc count");		\
+		}							\
+		if (last_error.type == MP_CHECK_ERROR_EXT) {		\
+			is(last_error.ext_type, ext_type_,		\
+			   msg_ " - error ext type");			\
+			is(last_error.ext_len, ext_len_,		\
+			   msg_ " - error ext len");			\
+		}							\
+	} while (0)
+
+#define check_error_trunc(data_, offset_, trunc_count_, msg_)		\
+	check_error(data_, offset_, MP_CHECK_ERROR_TRUNC,		\
+		    trunc_count_, 0, 0, msg_)
+
+#define check_error_ill(data_, offset_, msg_)				\
+	check_error(data_, offset_, MP_CHECK_ERROR_ILL, 0, 0, 0, msg_)
+
+#define check_error_ext(data_, offset_, ext_type_, ext_len_, msg_)	\
+	check_error(data_, offset_, MP_CHECK_ERROR_EXT,			\
+		    0, ext_type_, ext_len_, msg_)
+
+	check_error_trunc("", 0, 1, "empty");
+
+	check_error_trunc("\xa2", 0, 1, "trunc fixstr");
+	check_error_trunc("\xd9", 0, 1, "trunc str8 header");
+	check_error_trunc("\xd9\x10", 0, 1, "trunc str8 data");
+	check_error_trunc("\xda\x00", 0, 1, "trunc str16 header");
+	check_error_trunc("\xda\x00\x10", 0, 1, "trunc str16 data");
+	check_error_trunc("\xdb\x00\x00\x00", 0, 1, "trunc str32 header");
+	check_error_trunc("\xdb\x00\x00\x00\x10", 0, 1, "trunc str32 data");
+
+	check_error_trunc("\x92", 1, 2, "trunc fixarray");
+	check_error_trunc("\xdc\x00", 0, 1, "trunc array16 header");
+	check_error_trunc("\xdc\x00\x10", 3, 16, "trunc array16 data");
+	check_error_trunc("\xdd\x00\x00\x00", 0, 1, "trunc array32 header");
+	check_error_trunc("\xdd\x00\x00\x00\x10", 5, 16, "trunc array32 data");
+
+	check_error_trunc("\x82", 1, 4, "trunc fixmap");
+	check_error_trunc("\xde\x00", 0, 1, "trunc map16 header");
+	check_error_trunc("\xde\x00\x10", 3, 32, "trunc map16 data");
+	check_error_trunc("\xdf\x00\x00\x00", 0, 1, "trunc map32 header");
+	check_error_trunc("\xdf\x00\x00\x00\x10", 5, 32, "trunc map32 data");
+
+	check_error_trunc("\xd4", 0, 1, "trunc fixext header");
+	check_error_trunc("\xd4\x42", 0, 1, "trunc fixext data");
+	check_error_trunc("\xc7\x10", 0, 1, "trunc ext8 header");
+	check_error_trunc("\xc7\x10\x42", 0, 1, "trunc ext8 data");
+	check_error_trunc("\xc8\x00\x10", 0, 1, "trunc ext16 header");
+	check_error_trunc("\xc8\x00\x10\x42", 0, 1, "trunc ext16 data");
+	check_error_trunc("\xc9\x00\x00\x00\x10", 0, 1, "trunc ext32 header");
+	check_error_trunc("\xc9\x00\x00\x00\x10\x42", 0, 1, "trunc ext32 data");
+
+	check_error_trunc("\x92\x82", 2, 5, "trunc nested 1");
+	check_error_trunc("\x92\x82\xc0", 3, 4, "trunc nested 2");
+	check_error_trunc("\x92\x82\xc0\x92", 4, 5, "trunc nested 3");
+	check_error_trunc("\x92\x82\xc0\x92\x82", 5, 8, "trunc nested 4");
+
+	check_error_ill("\xc1", 0, "ill 1");
+	check_error_ill("\x92\xc1", 1, "ill 2");
+	check_error_ill("\x92\xc0\xc1", 2, "ill 3");
+
+	check_error_ext("\xd4\x42\x00", 2, 0x42, 1, "bad fixext");
+	check_error_ext("\xc7\x01\x42\x00", 3, 0x42, 1, "bad ext8");
+	check_error_ext("\xc8\x00\x01\x42\x00", 4, 0x42, 1, "bad ext16");
+	check_error_ext("\xc9\x00\x00\x00\x01\x42\x00", 6, 0x42, 1, "bad ext32");
+
+#undef check_error_ext
+#undef check_error_ill
+#undef check_error_trunc
+#undef check_error
+
+	mp_check_ext_data = mp_check_ext_data_svp;
+	mp_check_on_error = mp_check_on_error_svp;
+
+	footer();
+	return check_plan();
+}
+
 #define int_eq(a, b) (((a) - (b)) == 0)
 #define double_eq(a, b) (fabs((a) - (b)) < 1e-15)
 
@@ -1587,7 +1701,7 @@ test_overflow()
 
 int main()
 {
-	plan(25);
+	plan(26);
 	header();
 
 	test_uints();
@@ -1613,6 +1727,7 @@ int main()
 	test_mp_print_ext();
 	test_mp_check();
 	test_mp_check_ext_data();
+	test_mp_check_error();
 	test_numbers();
 	test_overflow();
 

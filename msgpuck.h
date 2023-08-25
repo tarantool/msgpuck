@@ -1665,6 +1665,8 @@ enum mp_check_error_type {
 	MP_CHECK_ERROR_ILL,
 	/** MsgPack extension check failed. */
 	MP_CHECK_ERROR_EXT,
+	/** Junk after MsgPack data (mp_check_exact() only). */
+	MP_CHECK_ERROR_JUNK,
 };
 
 /** mp_check() error info. */
@@ -1713,6 +1715,22 @@ extern mp_check_on_error_f mp_check_on_error;
  */
 MP_PROTO int
 mp_check(const char **data, const char *end);
+
+/**
+ * \brief Equivalent to mp_check() but also checks that there is no more
+ * data after validated MsgPack.
+ * \param data - the pointer to a buffer
+ * \param end - the end of a buffer
+ * \retval 0 when MsgPack in \a data is valid and there is no more data
+ * after validated MsgPack.
+ * \retval != 0 when MsgPack in \a data is not valid or there is data
+ * after validated MsgPack.
+ * \post *data = end on success
+ * \post *data is not defined if MsgPack is not valid
+ * \sa mp_check()
+ */
+MP_PROTO int
+mp_check_exact(const char **data, const char *end);
 
 /**
  * The maximum msgpack nesting depth supported by mp_snprint().
@@ -3219,6 +3237,24 @@ mp_check(const char **data, const char *end)
 	assert(*data <= end);
 #undef MP_CHECK_LEN
 #undef MP_CHECK_EXT
+	return 0;
+}
+
+MP_IMPL int
+mp_check_exact(const char **data, const char *end)
+{
+	const char *begin = *data;
+	if (mp_check(data, end) != 0)
+		return 1;
+	if (*data != end) {
+		struct mp_check_error err;
+		err.type = MP_CHECK_ERROR_JUNK;
+		err.data = begin;
+		err.end = end;
+		err.pos = *data;
+		mp_check_on_error(&err);
+		return 1;
+	}
 	return 0;
 }
 

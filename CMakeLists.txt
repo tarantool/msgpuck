@@ -1,5 +1,5 @@
+cmake_minimum_required(VERSION 3.5)
 project(msgpuck C)
-cmake_minimum_required(VERSION 2.8.5)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -fPIC -fstrict-aliasing")

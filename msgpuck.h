@@ -1550,6 +1550,28 @@ MP_PROTO char *
 mp_memcpy_safe(char *data, ptrdiff_t *data_sz, const char *str, uint32_t len);
 
 /**
+ * \brief Decode an integer value as int8_t from MsgPack \a data.
+ * \param data - the pointer to a buffer
+ * \param[out] ret - the pointer to save a result
+ * \retval  0 on success
+ * \retval -1 if underlying mp type is not MP_INT or MP_UINT
+ * \retval -1 if the result can't be stored in int8_t
+ */
+MP_PROTO int
+mp_read_int8(const char **data, int8_t *ret);
+
+/**
+ * \brief Decode an integer value as int16_t from MsgPack \a data.
+ * \param data - the pointer to a buffer
+ * \param[out] ret - the pointer to save a result
+ * \retval  0 on success
+ * \retval -1 if underlying mp type is not MP_INT or MP_UINT
+ * \retval -1 if the result can't be stored in int16_t
+ */
+MP_PROTO int
+mp_read_int16(const char **data, int16_t *ret);
+
+/**
  * \brief Decode an integer value as int32_t from MsgPack \a data.
  * \param data - the pointer to a buffer
  * \param[out] ret - the pointer to save a result
@@ -2779,6 +2801,64 @@ mp_decode_bool(const char **data)
 	default:
 		mp_unreachable();
 	}
+}
+
+MP_IMPL int
+mp_read_int8(const char **data, int8_t *ret)
+{
+	uint8_t uval;
+	const char *p = *data;
+	uint8_t c = mp_load_u8(&p);
+	switch (c) {
+	case 0xd0:
+		*ret = (int8_t) mp_load_u8(&p);
+		break;
+	case 0xcc:
+		uval = mp_load_u8(&p);
+		if (mp_unlikely(uval > INT8_MAX))
+			return -1;
+		*ret = uval;
+		break;
+	default:
+		if (mp_unlikely(c < 0xe0 && c > 0x7f))
+			return -1;
+		*ret = (int8_t) c;
+		break;
+	}
+	*data = p;
+	return 0;
+}
+
+MP_IMPL int
+mp_read_int16(const char **data, int16_t *ret)
+{
+	uint16_t uval;
+	const char *p = *data;
+	uint8_t c = mp_load_u8(&p);
+	switch (c) {
+	case 0xd0:
+		*ret = (int8_t) mp_load_u8(&p);
+		break;
+	case 0xd1:
+		*ret = (int16_t) mp_load_u16(&p);
+		break;
+	case 0xcc:
+		*ret = mp_load_u8(&p);
+		break;
+	case 0xcd:
+		uval = mp_load_u16(&p);
+		if (mp_unlikely(uval > INT16_MAX))
+			return -1;
+		*ret = uval;
+		break;
+	default:
+		if (mp_unlikely(c < 0xe0 && c > 0x7f))
+			return -1;
+		*ret = (int8_t) c;
+		break;
+	}
+	*data = p;
+	return 0;
 }
 
 MP_IMPL int

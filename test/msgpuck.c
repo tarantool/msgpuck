@@ -1645,6 +1645,8 @@ test_mp_check_error(void)
 	}								\
 } while (0)
 
+#define test_read_int8(...)         test_read_number(mp_read_int8, int_eq, int8_t, __VA_ARGS__)
+#define test_read_int16(...)        test_read_number(mp_read_int16, int_eq, int16_t, __VA_ARGS__)
 #define test_read_int32(...)        test_read_number(mp_read_int32, int_eq, int32_t, __VA_ARGS__)
 #define test_read_int64(...)        test_read_number(mp_read_int64, int_eq, int64_t, __VA_ARGS__)
 #define test_read_double(...)       test_read_number(mp_read_double, double_eq, double, __VA_ARGS__)
@@ -1653,8 +1655,26 @@ test_mp_check_error(void)
 static int
 test_numbers()
 {
-	plan(134);
+	plan(174);
 	header();
+
+	test_read_int8(uint, 12, true);
+	test_read_int8(uint, 127, true);
+	test_read_int8(uint, 128, false);
+	test_read_int8(int, -12, true);
+	test_read_int8(int, -128, true);
+	test_read_int8(int, -129, false);
+	test_read_int8(float, -3e-4, false);
+	test_read_int8(double, 123.45, false);
+
+	test_read_int16(uint, 123, true);
+	test_read_int16(uint, 32767, true);
+	test_read_int16(uint, 32768, false);
+	test_read_int16(int, -123, true);
+	test_read_int16(int, -32768, true);
+	test_read_int16(int, -32769, false);
+	test_read_int16(float, -2e-3, false);
+	test_read_int16(double, 12.345, false);
 
 	test_read_int32(uint, 123, true);
 	test_read_int32(uint, 12345, true);

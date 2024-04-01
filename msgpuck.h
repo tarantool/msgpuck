@@ -1576,8 +1576,9 @@ mp_read_int16(const char **data, int16_t *ret);
  * \param data - the pointer to a buffer
  * \param[out] ret - the pointer to save a result
  * \retval  0 on success
- * \retval -1 if underlying mp type is not MP_INT or MP_UINT
- * \retval -1 if the result can't be stored in int32_t
+ * \retval -1
+ * - if underlying mp type is not MP_INT or MP_UINT
+ * - if the result can't be stored in int32_t
  */
 MP_PROTO int
 mp_read_int32(const char **data, int32_t *ret);
@@ -1587,8 +1588,9 @@ mp_read_int32(const char **data, int32_t *ret);
  * \param data - the pointer to a buffer
  * \param[out] ret - the pointer to save a result
  * \retval  0 on success
- * \retval -1 if underlying mp type is not MP_INT or MP_UINT
- * \retval -1 if the result can't be stored in int64_t
+ * \retval -1
+ * - if underlying mp type is not MP_INT or MP_UINT
+ * - if the result can't be stored in int64_t
  */
 MP_PROTO int
 mp_read_int64(const char **data, int64_t *ret);
@@ -1598,9 +1600,9 @@ mp_read_int64(const char **data, int64_t *ret);
  * \param data - the pointer to a buffer
  * \param[out] ret - the pointer to save a result
  * \retval  0 on success
- * \retval -1 if underlying mp type is not MP_INT, MP_UINT,
- *            MP_FLOAT, or MP_DOUBLE
- * \retval -1 if the result can't be stored in double
+ * \retval -1
+ * - if underlying mp type is not MP_INT, MP_UINT, MP_FLOAT, or MP_DOUBLE
+ * - if the result can't be stored in double
  */
 MP_PROTO int
 mp_read_double(const char **data, double *ret);

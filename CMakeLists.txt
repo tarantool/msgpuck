@@ -1,5 +1,5 @@
+cmake_minimum_required(VERSION 3.5)
 project(msgpuck C)
-cmake_minimum_required(VERSION 2.8.5)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -fPIC -fstrict-aliasing")
@@ -45,6 +45,8 @@ if(NOT DOXYGEN_FOUND)
     return()
 endif()
 
+find_program(SED_EXECUTABLE sed)
+
 set(GENERATE_HTML "NO")
 set(GENERATE_MAN "YES")
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in"
@@ -66,7 +68,8 @@ add_custom_command(OUTPUT doc/html/index.html
     COMMAND ${DOXYGEN_EXECUTABLE} "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.html"
     COMMAND ${CMAKE_COMMAND} -E rename doc/html/msgpuck_8h.html
                                        doc/html/index.html
-    COMMAND sed s/msgpuck_8h\\.html/index\\.html/ -i doc/html/index.html
+    COMMAND ${SED_EXECUTABLE} -i'' -e s/msgpuck_8h\\.html/index\\.html/
+                                   doc/html/index.html
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     DEPENDS msgpuck.h
     COMMENT "Generating html documentation" VERBATIM)

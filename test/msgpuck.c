@@ -43,6 +43,10 @@
 #define BUF_MAXLEN ((1L << 18) - 1)
 #define STRBIN_MAXLEN (BUF_MAXLEN - 10)
 
+#ifndef lengthof
+#define lengthof(array) (sizeof(array) / sizeof((array)[0]))
+#endif
+
 static char buf[BUF_MAXLEN + 1];
 static char str[STRBIN_MAXLEN];
 static char *data = buf + 1; /* use unaligned address to fail early */
@@ -734,38 +738,82 @@ test_next_on_maps(void)
 	return check_plan();
 }
 
+static bool
+test_encode_uint_custom_size(char *buf, uint64_t val, int size)
+{
+	char *pos;
+	switch (size) {
+	case 1:
+		if (val > 0x7f)
+			return false;
+		mp_store_u8(buf, val);
+		return true;
+	case 2:
+		if (val > UINT8_MAX)
+			return false;
+		pos = mp_store_u8(buf, 0xcc);
+		mp_store_u8(pos, (uint8_t)val);
+		return true;
+	case 3:
+		if (val > UINT16_MAX)
+			return false;
+		pos = mp_store_u8(buf, 0xcd);
+		mp_store_u16(pos, (uint16_t)val);
+		return true;
+	case 5:
+		if (val > UINT32_MAX)
+			return false;
+		pos = mp_store_u8(buf, 0xce);
+		mp_store_u32(pos, (uint32_t)val);
+		return true;
+	case 9:
+		pos = mp_store_u8(buf, 0xcf);
+		mp_store_u64(pos, val);
+		return true;
+	}
+	abort();
+	return false;
+}
+
 static void
 test_compare_uint(uint64_t a, uint64_t b)
 {
-	char bufa[9];
-	char bufb[9];
-	mp_encode_uint(bufa, a);
-	mp_encode_uint(bufb, b);
-	int r = mp_compare_uint(bufa, bufb);
-	if (a < b) {
-		ok(r < 0, "mp_compare_uint(%"PRIu64", %" PRIu64 ") < 0", a, b);
-	} else if (a > b) {
-		ok(r > 0, "mp_compare_uint(%"PRIu64", %" PRIu64") > 0", a, b);
-	} else {
-		ok(r == 0, "mp_compare_uint(%"PRIu64", %"PRIu64") == 0", a, b);
+	int sizes[] = {1, 2, 3, 5, 9};
+	int count = lengthof(sizes);
+	for (int ai = 0; ai < count; ++ai) {
+		char bufa[16];
+		if (!test_encode_uint_custom_size(bufa, a, sizes[ai]))
+			continue;
+		for (int bi = 0; bi < count; ++bi) {
+			char bufb[16];
+			if (!test_encode_uint_custom_size(bufb, b, sizes[bi]))
+				continue;
+			int r = mp_compare_uint(bufa, bufb);
+			if (a < b) {
+				ok(r < 0, "mp_compare_uint(%" PRIu64 ", "
+				   "%" PRIu64 ") < 0", a, b);
+			} else if (a > b) {
+				ok(r > 0, "mp_compare_uint(%" PRIu64 ", "
+				   "%" PRIu64 ") > 0", a, b);
+			} else {
+				ok(r == 0, "mp_compare_uint(%" PRIu64 ", "
+				   "%" PRIu64 ") == 0", a, b);
+			}
+		}
 	}
 }
 
 static int
 test_compare_uints(void)
 {
-	plan(227);
+	plan(2209);
 	header();
-
-	test_compare_uint(0, 0);
-	test_compare_uint(0, 0);
 
 	uint64_t nums[] = {
 		0, 1, 0x7eU, 0x7fU, 0x80U, 0xfeU, 0xffU, 0xfffeU, 0xffffU,
 		0x10000U, 0xfffffffeU, 0xffffffffU, 0x100000000ULL,
 		0xfffffffffffffffeULL, 0xffffffffffffffffULL
 	};
-
 	int count = sizeof(nums) / sizeof(*nums);
 	for (int i = 0; i < count; i++) {
 		for (int j = 0; j < count; j++) {

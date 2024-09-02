@@ -815,6 +815,10 @@ mp_check_uint(const char *cur, const char *end);
 MP_PROTO MP_PURE ptrdiff_t
 mp_check_int(const char *cur, const char *end);
 
+/** \brief Decode unsigned int tail with the first byte \a type already known. */
+MP_PROTO uint64_t
+mp_decode_uint_data(uint8_t type, const char **data);
+
 /**
  * \brief Decode an unsigned integer from MsgPack \a data
  * \param data - the pointer to a buffer
@@ -2275,10 +2279,9 @@ mp_encode_int_safe(char *data, ptrdiff_t *data_sz, int64_t num)
 }
 
 MP_IMPL uint64_t
-mp_decode_uint(const char **data)
+mp_decode_uint_data(uint8_t type, const char **data)
 {
-	uint8_t c = mp_load_u8(data);
-	switch (c) {
+	switch (type) {
 	case 0xcc:
 		return mp_load_u8(data);
 	case 0xcd:
@@ -2288,10 +2291,16 @@ mp_decode_uint(const char **data)
 	case 0xcf:
 		return mp_load_u64(data);
 	default:
-		if (mp_unlikely(c > 0x7f))
+		if (mp_unlikely(type > 0x7f))
 			mp_unreachable();
-		return c;
+		return type;
 	}
+}
+
+MP_IMPL uint64_t
+mp_decode_uint(const char **data)
+{
+	return mp_decode_uint_data(mp_load_u8(data), data);
 }
 
 MP_IMPL int
@@ -2299,39 +2308,33 @@ mp_compare_uint(const char *data_a, const char *data_b)
 {
 	uint8_t ca = mp_load_u8(&data_a);
 	uint8_t cb = mp_load_u8(&data_b);
-
-	int r = ca - cb;
-	if (r != 0)
-		return r;
-
-	if (ca <= 0x7f)
-		return 0;
-
 	uint64_t a, b;
-	switch (ca & 0x3) {
-	case 0xcc & 0x3:
+	if (ca != cb) {
+		a = mp_decode_uint_data(ca, &data_a);
+		b = mp_decode_uint_data(cb, &data_b);
+		return a < b ? -1 : a > b;
+	}
+	switch (ca) {
+	case 0xcc:
 		a = mp_load_u8(&data_a);
 		b = mp_load_u8(&data_b);
 		break;
-	case 0xcd & 0x3:
+	case 0xcd:
 		a = mp_load_u16(&data_a);
 		b = mp_load_u16(&data_b);
 		break;
-	case 0xce & 0x3:
+	case 0xce:
 		a = mp_load_u32(&data_a);
 		b = mp_load_u32(&data_b);
 		break;
-	case 0xcf & 0x3:
+	case 0xcf:
 		a = mp_load_u64(&data_a);
 		b = mp_load_u64(&data_b);
-		return a < b ? -1 : a > b;
 		break;
 	default:
-		mp_unreachable();
+		return 0;
 	}
-
-	int64_t v = (a - b);
-	return (v > 0) - (v < 0);
+	return a < b ? -1 : a > b;
 }
 
 MP_IMPL int64_t

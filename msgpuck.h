@@ -2809,25 +2809,52 @@ mp_decode_bool(const char **data)
 MP_IMPL int
 mp_read_int8(const char **data, int8_t *ret)
 {
-	uint8_t uval;
+	int64_t ival;
+	uint64_t uval;
 	const char *p = *data;
 	uint8_t c = mp_load_u8(&p);
 	switch (c) {
 	case 0xd0:
-		*ret = (int8_t) mp_load_u8(&p);
-		break;
+		*ret = (int8_t)mp_load_u8(&p);
+		goto commit;
+	case 0xd1:
+		ival = (int16_t)mp_load_u16(&p);
+		goto handle_signed;
+	case 0xd2:
+		ival = (int32_t)mp_load_u32(&p);
+		goto handle_signed;
+	case 0xd3:
+		ival = (int64_t)mp_load_u64(&p);
+		goto handle_signed;
 	case 0xcc:
 		uval = mp_load_u8(&p);
-		if (mp_unlikely(uval > INT8_MAX))
-			return -1;
-		*ret = uval;
-		break;
+		goto handle_unsigned;
+	case 0xcd:
+		uval = mp_load_u16(&p);
+		goto handle_unsigned;
+	case 0xce:
+		uval = mp_load_u32(&p);
+		goto handle_unsigned;
+	case 0xcf:
+		uval = mp_load_u64(&p);
+		goto handle_unsigned;
 	default:
 		if (mp_unlikely(c < 0xe0 && c > 0x7f))
 			return -1;
 		*ret = (int8_t) c;
-		break;
+		goto commit;
 	}
+handle_signed:
+	if (mp_unlikely(ival > INT8_MAX || ival < INT8_MIN))
+		return -1;
+	*ret = (int8_t)ival;
+	goto commit;
+handle_unsigned:
+	if (mp_unlikely(uval > INT8_MAX))
+		return -1;
+	*ret = (int8_t)uval;
+	goto commit;
+commit:
 	*data = p;
 	return 0;
 }
@@ -2835,31 +2862,52 @@ mp_read_int8(const char **data, int8_t *ret)
 MP_IMPL int
 mp_read_int16(const char **data, int16_t *ret)
 {
-	uint16_t uval;
+	int64_t ival;
+	uint64_t uval;
 	const char *p = *data;
 	uint8_t c = mp_load_u8(&p);
 	switch (c) {
 	case 0xd0:
-		*ret = (int8_t) mp_load_u8(&p);
-		break;
+		*ret = (int8_t)mp_load_u8(&p);
+		goto commit;
 	case 0xd1:
-		*ret = (int16_t) mp_load_u16(&p);
-		break;
+		*ret = (int16_t)mp_load_u16(&p);
+		goto commit;
+	case 0xd2:
+		ival = (int32_t)mp_load_u32(&p);
+		goto handle_signed;
+	case 0xd3:
+		ival = (int64_t)mp_load_u64(&p);
+		goto handle_signed;
 	case 0xcc:
-		*ret = mp_load_u8(&p);
-		break;
+		*ret = (int16_t)mp_load_u8(&p);
+		goto commit;
 	case 0xcd:
 		uval = mp_load_u16(&p);
-		if (mp_unlikely(uval > INT16_MAX))
-			return -1;
-		*ret = uval;
-		break;
+		goto handle_unsigned;
+	case 0xce:
+		uval = mp_load_u32(&p);
+		goto handle_unsigned;
+	case 0xcf:
+		uval = mp_load_u64(&p);
+		goto handle_unsigned;
 	default:
 		if (mp_unlikely(c < 0xe0 && c > 0x7f))
 			return -1;
 		*ret = (int8_t) c;
-		break;
+		goto commit;
 	}
+handle_signed:
+	if (mp_unlikely(ival > INT16_MAX || ival < INT16_MIN))
+		return -1;
+	*ret = (int16_t)ival;
+	goto commit;
+handle_unsigned:
+	if (mp_unlikely(uval > INT16_MAX))
+		return -1;
+	*ret = (int16_t)uval;
+	goto commit;
+commit:
 	*data = p;
 	return 0;
 }
@@ -2867,37 +2915,50 @@ mp_read_int16(const char **data, int16_t *ret)
 MP_IMPL int
 mp_read_int32(const char **data, int32_t *ret)
 {
-	uint32_t uval;
+	int64_t ival;
+	uint64_t uval;
 	const char *p = *data;
 	uint8_t c = mp_load_u8(&p);
 	switch (c) {
 	case 0xd0:
-		*ret = (int8_t) mp_load_u8(&p);
-		break;
+		*ret = (int8_t)mp_load_u8(&p);
+		goto commit;
 	case 0xd1:
-		*ret = (int16_t) mp_load_u16(&p);
-		break;
+		*ret = (int16_t)mp_load_u16(&p);
+		goto commit;
 	case 0xd2:
-		*ret = (int32_t) mp_load_u32(&p);
-		break;
+		*ret = (int32_t)mp_load_u32(&p);
+		goto commit;
+	case 0xd3:
+		ival = (int64_t)mp_load_u64(&p);
+		if (mp_unlikely(ival > INT32_MAX || ival < INT32_MIN))
+			return -1;
+		*ret = (int32_t)ival;
+		goto commit;
 	case 0xcc:
-		*ret = mp_load_u8(&p);
-		break;
+		*ret = (int32_t)mp_load_u8(&p);
+		goto commit;
 	case 0xcd:
-		*ret = mp_load_u16(&p);
-		break;
+		*ret = (int32_t)mp_load_u16(&p);
+		goto commit;
 	case 0xce:
 		uval = mp_load_u32(&p);
-		if (mp_unlikely(uval > INT32_MAX))
-			return -1;
-		*ret = uval;
-		break;
+		goto handle_unsigned;
+	case 0xcf:
+		uval = mp_load_u64(&p);
+		goto handle_unsigned;
 	default:
 		if (mp_unlikely(c < 0xe0 && c > 0x7f))
 			return -1;
 		*ret = (int8_t) c;
-		break;
+		goto commit;
 	}
+handle_unsigned:
+	if (mp_unlikely(uval > INT32_MAX))
+		return -1;
+	*ret = (int32_t)uval;
+	goto commit;
+commit:
 	*data = p;
 	return 0;
 }
@@ -2910,31 +2971,31 @@ mp_read_int64(const char **data, int64_t *ret)
 	uint8_t c = mp_load_u8(&p);
 	switch (c) {
 	case 0xd0:
-		*ret = (int8_t) mp_load_u8(&p);
+		*ret = (int8_t)mp_load_u8(&p);
 		break;
 	case 0xd1:
-		*ret = (int16_t) mp_load_u16(&p);
+		*ret = (int16_t)mp_load_u16(&p);
 		break;
 	case 0xd2:
-		*ret = (int32_t) mp_load_u32(&p);
+		*ret = (int32_t)mp_load_u32(&p);
 		break;
 	case 0xd3:
-		*ret = (int64_t) mp_load_u64(&p);
+		*ret = (int64_t)mp_load_u64(&p);
 		break;
 	case 0xcc:
-		*ret = mp_load_u8(&p);
+		*ret = (int64_t)mp_load_u8(&p);
 		break;
 	case 0xcd:
-		*ret = mp_load_u16(&p);
+		*ret = (int64_t)mp_load_u16(&p);
 		break;
 	case 0xce:
-		*ret = mp_load_u32(&p);
+		*ret = (int64_t)mp_load_u32(&p);
 		break;
 	case 0xcf:
 		uval = mp_load_u64(&p);
-		if (uval > INT64_MAX)
+		if (mp_unlikely(uval > INT64_MAX))
 			return -1;
-		*ret = uval;
+		*ret = (int64_t)uval;
 		break;
 	default:
 		if (mp_unlikely(c < 0xe0 && c > 0x7f))

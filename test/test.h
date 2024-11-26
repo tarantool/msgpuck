@@ -35,6 +35,10 @@
 
 #include <stdio.h>
 
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /**
 @brief example
 
@@ -124,5 +128,9 @@ int check_plan(void);
 		fprintf(stderr, "#   in %s at line %d\n", __FILE__, __LINE__); \
 	}						\
 }
+
+#if defined(__cplusplus)
+}
+#endif /* defined(__cplusplus) */
 
 #endif /* TEST_H_INCLUDED */

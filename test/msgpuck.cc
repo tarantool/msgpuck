@@ -29,7 +29,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
@@ -1155,9 +1154,9 @@ test_mp_print()
 	int mp_buff_sz = (MP_PRINT_MAX_DEPTH + 1) * mp_sizeof_array(1) +
 			 mp_sizeof_uint(1);
 	int exp_str_sz = 2 * (MP_PRINT_MAX_DEPTH + 1) + 3 + 1;
-	char *mp_buff = malloc(mp_buff_sz);
-	char *exp_str = malloc(exp_str_sz);
-	char *decoded = malloc(exp_str_sz);
+	char *mp_buff = (char *)malloc(mp_buff_sz);
+	char *exp_str = (char *)malloc(exp_str_sz);
+	char *decoded = (char *)malloc(exp_str_sz);
 	char *buff_wptr = mp_buff;
 	char *exp_str_wptr = exp_str;
 	for (int i = 0; i <= 2 * (MP_PRINT_MAX_DEPTH + 1); i++) {

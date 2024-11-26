@@ -40,8 +40,12 @@
 #include "msgpuck.h"
 #include "test.h"
 
+#include <type_traits>
+
 #define BUF_MAXLEN ((1L << 18) - 1)
 #define STRBIN_MAXLEN (BUF_MAXLEN - 10)
+#define MP_NUMBER_MAX_LEN 16
+#define MP_NUMBER_CODEC_COUNT 16
 
 #ifndef lengthof
 #define lengthof(array) (sizeof(array) / sizeof((array)[0]))
@@ -775,20 +779,86 @@ test_encode_uint_custom_size(char *buf, uint64_t val, int size)
 	return false;
 }
 
-static void
-test_compare_uint(uint64_t a, uint64_t b)
+static bool
+test_encode_int_custom_size(char *buf, int64_t val, int size)
+{
+	char *pos;
+	switch (size) {
+	case 1:
+		if (val > 0x7f || val < -0x20)
+			return false;
+		if (val >= 0)
+			mp_store_u8(buf, val);
+		else
+			mp_store_u8(buf, (uint8_t)(0xe0 | val));
+		return true;
+	case 2:
+		if (val < INT8_MIN || val > INT8_MAX)
+			return false;
+		pos = mp_store_u8(buf, 0xd0);
+		mp_store_u8(pos, (uint8_t)val);
+		return true;
+	case 3:
+		if (val < INT16_MIN || val > INT16_MAX)
+			return false;
+		pos = mp_store_u8(buf, 0xd1);
+		mp_store_u16(pos, (uint16_t)val);
+		return true;
+	case 5:
+		if (val < INT32_MIN || val > INT32_MAX)
+			return false;
+		pos = mp_store_u8(buf, 0xd2);
+		mp_store_u32(pos, (uint32_t)val);
+		return true;
+	case 9:
+		pos = mp_store_u8(buf, 0xd3);
+		mp_store_u64(pos, val);
+		return true;
+	}
+	abort();
+	return false;
+}
+
+static int
+test_encode_uint_all_sizes(char mp_nums[][MP_NUMBER_MAX_LEN], uint64_t val)
 {
 	int sizes[] = {1, 2, 3, 5, 9};
 	int count = lengthof(sizes);
-	for (int ai = 0; ai < count; ++ai) {
-		char bufa[16];
-		if (!test_encode_uint_custom_size(bufa, a, sizes[ai]))
-			continue;
-		for (int bi = 0; bi < count; ++bi) {
-			char bufb[16];
-			if (!test_encode_uint_custom_size(bufb, b, sizes[bi]))
-				continue;
-			int r = mp_compare_uint(bufa, bufb);
+	int used = 0;
+	for (int i = 0; i < count; ++i) {
+		assert(used < MP_NUMBER_CODEC_COUNT);
+		if (test_encode_uint_custom_size(mp_nums[used], val, sizes[i]))
+			++used;
+	}
+	return used;
+}
+
+static int
+test_encode_int_all_sizes(char mp_nums[][MP_NUMBER_MAX_LEN], int64_t val)
+{
+	int sizes[] = {1, 2, 3, 5, 9};
+	int count = lengthof(sizes);
+	int used = 0;
+	for (int i = 0; i < count; ++i) {
+		assert(used < MP_NUMBER_CODEC_COUNT);
+		if (test_encode_int_custom_size(mp_nums[used], val, sizes[i]))
+			++used;
+	}
+	return used;
+}
+
+static void
+test_compare_uint(uint64_t a, uint64_t b)
+{
+	char mp_nums_a[MP_NUMBER_CODEC_COUNT][MP_NUMBER_MAX_LEN];
+	int count_a = test_encode_uint_all_sizes(mp_nums_a, a);
+
+	char mp_nums_b[MP_NUMBER_CODEC_COUNT][MP_NUMBER_MAX_LEN];
+	int count_b = test_encode_uint_all_sizes(mp_nums_b, b);
+
+	for (int ai = 0; ai < count_a; ++ai) {
+		for (int bi = 0; bi < count_b; ++bi) {
+			int r = mp_compare_uint(mp_nums_a[ai], mp_nums_b[bi]);
 			if (a < b) {
 				ok(r < 0, "mp_compare_uint(%" PRIu64 ", "
 				   "%" PRIu64 ") < 0", a, b);
@@ -1674,108 +1744,237 @@ test_mp_check_error(void)
 	return check_plan();
 }
 
-#define int_eq(a, b) (((a) - (b)) == 0)
 #define double_eq(a, b) (fabs((a) - (b)) < 1e-15)
 
-#define test_read_number(_func, _eq,  _type, _mp_type, _val, _success) do {	\
-	const char *s = #_func "(mp_encode_" #_mp_type "(" #_val "))";	\
-	const char *d1 = data;						\
-	const char *d2 = mp_encode_##_mp_type(data, _val);		\
-	_type v;							\
-	int ret = _func(&d1, &v);					\
-	if (_success) {							\
-		is(ret, 0, "%s check success", s);			\
-		is(d1, d2, "%s check pos advanced", s);			\
-		ok(_eq(v, (_type)_val), "%s check result", s);		\
-	} else {							\
-		is(ret, -1, "%s check fail", s);			\
-		is(d1, data, "%s check pos unchanged", s);		\
-	}								\
-} while (0)
+template<typename TargetT, typename ValueT, typename ReadF>
+static void
+test_read_num(ValueT num1, ReadF read_f, bool is_ok)
+{
+	/*
+	 * Build the header message.
+	 */
+	const int str_cap = 256;
+	char str[str_cap];
+	char *end = str + str_cap;
+	char *pos = str + snprintf(str, str_cap, "typed read of ");
+	if (std::is_same<ValueT, float>::value)
+		pos += snprintf(pos, end - pos, "%f", (float)num1);
+	else if (std::is_same<ValueT, double>::value)
+		pos += snprintf(pos, end - pos, "%lf", (double)num1);
+	else if (num1 >= 0)
+		pos += snprintf(pos, end - pos, "%llu", (long long)num1);
+	else
+		pos += snprintf(pos, end - pos, "%lld", (long long)num1);
+	pos += snprintf(pos, end - pos, " into ");
 
-#define test_read_int8(...)         test_read_number(mp_read_int8, int_eq, int8_t, __VA_ARGS__)
-#define test_read_int16(...)        test_read_number(mp_read_int16, int_eq, int16_t, __VA_ARGS__)
-#define test_read_int32(...)        test_read_number(mp_read_int32, int_eq, int32_t, __VA_ARGS__)
-#define test_read_int64(...)        test_read_number(mp_read_int64, int_eq, int64_t, __VA_ARGS__)
-#define test_read_double(...)       test_read_number(mp_read_double, double_eq, double, __VA_ARGS__)
-#define test_read_double_lossy(...) test_read_number(mp_read_double_lossy, double_eq, double, __VA_ARGS__)
+	static_assert(!std::is_same<TargetT, float>::value,
+		      "no float reading");
+	if (std::is_integral<TargetT>::value) {
+		pos += snprintf(pos, end - pos, "int%zu_t",
+				sizeof(TargetT) * 8);
+	} else {
+		pos += snprintf(pos, end - pos, "double");
+	}
+	note("%s", str);
+	/*
+	 * Perform the actual tests.
+	 */
+	char mp_nums[MP_NUMBER_CODEC_COUNT][MP_NUMBER_MAX_LEN];
+	int count = 0;
+	if (std::is_integral<ValueT>::value) {
+		if (num1 >= 0) {
+			count += test_encode_uint_all_sizes(
+				&mp_nums[count], num1);
+		}
+		if (num1 <= INT64_MAX) {
+			count += test_encode_int_all_sizes(
+				&mp_nums[count], num1);
+		}
+	} else if (!std::is_integral<TargetT>::value || !is_ok) {
+		/*
+		 * Only encode floating point types when
+		 * 1) expect to also decode them back successfully.
+		 * 2) want to fail to decode an integer.
+		 *
+		 * Encoding integers as floats for decoding them back into
+		 * integers won't work.
+		 */
+		if (std::is_same<ValueT, float>::value)
+			mp_encode_float(mp_nums[count++], (float)num1);
+		mp_encode_double(mp_nums[count++], (double)num1);
+	}
+	for (int i = 0; i < count; ++i) {
+		const char *mp_num_pos1 = mp_nums[i];
+		char code = *mp_num_pos1;
+		/* Sanity check of the test encoding. */
+		if (mp_typeof(*mp_num_pos1) == MP_INT) {
+			fail_unless(mp_decode_int(&mp_num_pos1) ==
+				    (int64_t)num1);
+		} else if (mp_typeof(*mp_num_pos1) == MP_UINT) {
+			fail_unless(mp_decode_uint(&mp_num_pos1) ==
+				    (uint64_t)num1);
+		} else if (mp_typeof(*mp_num_pos1) == MP_FLOAT) {
+			fail_unless(mp_decode_float(&mp_num_pos1) ==
+				    (float)num1);
+		} else {
+			fail_unless(mp_decode_double(&mp_num_pos1) ==
+				    (double)num1);
+		}
+
+		const char *mp_num_pos2 = mp_nums[i];
+		TargetT num2 = 0;
+		int rc = read_f(&mp_num_pos2, &num2);
+		if (!is_ok) {
+			is(rc, -1, "check failure for code 0x%02X", code);
+			is(mp_num_pos2, mp_nums[i], "check position");
+			continue;
+		}
+		is(rc, 0, "check success for code 0x%02X", code);
+		is(mp_num_pos1, mp_num_pos2, "check position");
+		if (!std::is_integral<TargetT>::value) {
+			ok(double_eq(num1, num2), "check float number");
+			continue;
+		}
+		if (num1 >= 0) {
+			fail_unless(num2 >= 0);
+			is((uint64_t)num1, (uint64_t)num2, "check int number");
+		} else {
+			fail_unless(num2 < 0);
+			is((int64_t)num1, (int64_t)num2, "check int number");
+		}
+	}
+}
+
+template<typename TargetT, typename ReadF>
+static void
+test_read_num_from_non_numeric_mp(ReadF read_f)
+{
+	const int str_cap = 256;
+	char str[str_cap];
+	char *end = str + str_cap;
+	char *pos = str + snprintf(str, str_cap, "ensure failure of reading ");
+	if (std::is_integral<TargetT>::value) {
+		pos += snprintf(pos, end - pos, "int%zu_t",
+				sizeof(TargetT) * 8);
+	} else if (read_f == (void *)mp_read_double) {
+		pos += snprintf(pos, end - pos, "double");
+	} else if (read_f == (void *)mp_read_double_lossy) {
+		pos += snprintf(pos, end - pos, "double with precision loss");
+	} else {
+		abort();
+	}
+	note("%s", str);
+
+	char bad_types[16][16];
+	int bad_count = 0;
+	mp_encode_array(bad_types[bad_count++], 1);
+	mp_encode_map(bad_types[bad_count++], 1);
+	mp_encode_str0(bad_types[bad_count++], "abc");
+	mp_encode_bool(bad_types[bad_count++], true);
+	mp_encode_ext(bad_types[bad_count++], 1, "abc", 3);
+	mp_encode_bin(bad_types[bad_count++], "abc", 3);
+	mp_encode_nil(bad_types[bad_count++]);
+	for (int i = 0; i < bad_count; ++i) {
+		TargetT val;
+		const char *pos = bad_types[i];
+		char code = *pos;
+		int rc = read_f(&pos, &val);
+		is(rc, -1, "check fail for code 0x%02X", code);
+		is(pos, bad_types[i], "check position for code 0x%02X", code);
+	}
+}
+
+#define test_read_int8(num, success)						\
+	test_read_num<int8_t>(num, mp_read_int8, success)
+#define test_read_int16(num, success)						\
+	test_read_num<int16_t>(num, mp_read_int16, success)
+#define test_read_int32(num, success)						\
+	test_read_num<int32_t>(num, mp_read_int32, success)
+#define test_read_int64(num, success)						\
+	test_read_num<int64_t>(num, mp_read_int64, success)
+#define test_read_double(num, success)						\
+	test_read_num<double>(num, mp_read_double, success)
+#define test_read_double_lossy(num, success)					\
+	test_read_num<double>(num, mp_read_double_lossy, success)
 
 static int
-test_numbers()
+test_mp_read_typed()
 {
-	plan(174);
+	plan(716);
 	header();
 
-	test_read_int8(uint, 12, true);
-	test_read_int8(uint, 127, true);
-	test_read_int8(uint, 128, false);
-	test_read_int8(int, -12, true);
-	test_read_int8(int, -128, true);
-	test_read_int8(int, -129, false);
-	test_read_int8(float, -3e-4, false);
-	test_read_int8(double, 123.45, false);
+	test_read_int8(12, true);
+	test_read_int8(127, true);
+	test_read_int8(128, false);
+	test_read_int8(-12, true);
+	test_read_int8(-128, true);
+	test_read_int8(-129, false);
+	test_read_int8(-3e-4f, false);
+	test_read_int8(123.45, false);
+	test_read_num_from_non_numeric_mp<int8_t>(mp_read_int8);
 
-	test_read_int16(uint, 123, true);
-	test_read_int16(uint, 32767, true);
-	test_read_int16(uint, 32768, false);
-	test_read_int16(int, -123, true);
-	test_read_int16(int, -32768, true);
-	test_read_int16(int, -32769, false);
-	test_read_int16(float, -2e-3, false);
-	test_read_int16(double, 12.345, false);
+	test_read_int16(123, true);
+	test_read_int16(32767, true);
+	test_read_int16(32768, false);
+	test_read_int16(-123, true);
+	test_read_int16(-32768, true);
+	test_read_int16(-32769, false);
+	test_read_int16(-2e-3f, false);
+	test_read_int16(12.345, false);
+	test_read_num_from_non_numeric_mp<int16_t>(mp_read_int16);
 
-	test_read_int32(uint, 123, true);
-	test_read_int32(uint, 12345, true);
-	test_read_int32(uint, 2147483647, true);
-	test_read_int32(uint, 2147483648, false);
-	test_read_int32(int, -123, true);
-	test_read_int32(int, -12345, true);
-	test_read_int32(int, -2147483648, true);
-	test_read_int32(int, -2147483649LL, false);
-	test_read_int32(float, -1e2, false);
-	test_read_int32(double, 1.2345, false);
-	test_read_int32(map, 5, false);
+	test_read_int32(123, true);
+	test_read_int32(12345, true);
+	test_read_int32(2147483647, true);
+	test_read_int32(2147483648, false);
+	test_read_int32(-123, true);
+	test_read_int32(-12345, true);
+	test_read_int32(-2147483648, true);
+	test_read_int32(-2147483649LL, false);
+	test_read_int32(-1e2f, false);
+	test_read_int32(1.2345, false);
+	test_read_num_from_non_numeric_mp<int32_t>(mp_read_int32);
 
-	test_read_int64(uint, 123, true);
-	test_read_int64(uint, 12345, true);
-	test_read_int64(uint, 123456789, true);
-	test_read_int64(uint, 9223372036854775807ULL, true);
-	test_read_int64(uint, 9223372036854775808ULL, false);
-	test_read_int64(int, -123, true);
-	test_read_int64(int, -12345, true);
-	test_read_int64(int, -123456789, true);
-	test_read_int64(int, -9223372036854775807LL, true);
-	test_read_int64(float, 100, false);
-	test_read_int64(double, -5.4321, false);
-	test_read_int64(array, 10, false);
+	test_read_int64(123, true);
+	test_read_int64(12345, true);
+	test_read_int64(123456789, true);
+	test_read_int64(9223372036854775807ULL, true);
+	test_read_int64(9223372036854775808ULL, false);
+	test_read_int64(-123, true);
+	test_read_int64(-12345, true);
+	test_read_int64(-123456789, true);
+	test_read_int64(-9223372036854775807LL, true);
+	test_read_int64(100.0f, false);
+	test_read_int64(-5.4321, false);
+	test_read_num_from_non_numeric_mp<int64_t>(mp_read_int64);
 
-	test_read_double(uint, 123, true);
-	test_read_double(uint, 12345, true);
-	test_read_double(uint, 123456789, true);
-	test_read_double(uint, 1234567890000ULL, true);
-	test_read_double(uint, 123456789123456789ULL, false);
-	test_read_double(int, -123, true);
-	test_read_double(int, -12345, true);
-	test_read_double(int, -123456789, true);
-	test_read_double(int, -1234567890000LL, true);
-	test_read_double(int, -123456789123456789LL, false);
-	test_read_double(float, 6.565e6, true);
-	test_read_double(double, -5.555, true);
-	test_read_double(strl, 100, false);
+	test_read_double(123, true);
+	test_read_double(12345, true);
+	test_read_double(123456789, true);
+	test_read_double(1234567890000ULL, true);
+	test_read_double(123456789123456789ULL, false);
+	test_read_double(-123, true);
+	test_read_double(-12345, true);
+	test_read_double(-123456789, true);
+	test_read_double(-1234567890000LL, true);
+	test_read_double(-123456789123456789LL, false);
+	test_read_double(6.565e6f, true);
+	test_read_double(-5.555, true);
+	test_read_num_from_non_numeric_mp<double>(mp_read_double);
 
-	test_read_double_lossy(uint, 123, true);
-	test_read_double_lossy(uint, 12345, true);
-	test_read_double_lossy(uint, 123456789, true);
-	test_read_double_lossy(uint, 1234567890000ULL, true);
-	test_read_double_lossy(uint, 123456789123456789ULL, true);
-	test_read_double_lossy(int, -123, true);
-	test_read_double_lossy(int, -12345, true);
-	test_read_double_lossy(int, -123456789, true);
-	test_read_double_lossy(int, -1234567890000LL, true);
-	test_read_double_lossy(int, -123456789123456789LL, true);
-	test_read_double_lossy(float, 6.565e6, true);
-	test_read_double_lossy(double, -5.555, true);
-	test_read_double_lossy(strl, 100, false);
+	test_read_double_lossy(123, true);
+	test_read_double_lossy(12345, true);
+	test_read_double_lossy(123456789, true);
+	test_read_double_lossy(1234567890000ULL, true);
+	test_read_double_lossy(123456789123456789ULL, true);
+	test_read_double_lossy(-123, true);
+	test_read_double_lossy(-12345, true);
+	test_read_double_lossy(-123456789, true);
+	test_read_double_lossy(-1234567890000LL, true);
+	test_read_double_lossy(-123456789123456789LL, true);
+	test_read_double_lossy(6.565e6f, true);
+	test_read_double_lossy(-5.555, true);
+	test_read_num_from_non_numeric_mp<double>(mp_read_double_lossy);
 
 	footer();
 	return check_plan();
@@ -1857,7 +2056,7 @@ int main()
 	test_mp_check_exact();
 	test_mp_check_ext_data();
 	test_mp_check_error();
-	test_numbers();
+	test_mp_read_typed();
 	test_overflow();
 
 	footer();

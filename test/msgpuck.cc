@@ -36,6 +36,7 @@
 #include <limits.h>
 #include <math.h>
 
+#define UNIT_TAP_COMPATIBLE 1
 #include "msgpuck.h"
 #include "test.h"
 
@@ -1792,34 +1793,34 @@ test_overflow()
 	chk = data;
 	d = mp_encode_array(d, 1);
 	d = mp_encode_array(d, UINT32_MAX);
-	is(mp_check(&chk, d), 1, "mp_check array overflow")
+	is(mp_check(&chk, d), 1, "mp_check array overflow");
 
 	d = data;
 	chk = data;
 	d = mp_encode_array(d, 1);
 	d = mp_encode_map(d, UINT32_MAX);
-	is(mp_check(&chk, d), 1, "mp_check map overflow")
+	is(mp_check(&chk, d), 1, "mp_check map overflow");
 
 	d = data;
 	chk = data;
 	d = mp_encode_array(d, 2);
 	d = mp_encode_str(d, "", 0);
 	d = mp_encode_strl(d, UINT32_MAX);
-	is(mp_check(&chk, d), 1, "mp_check str overflow")
+	is(mp_check(&chk, d), 1, "mp_check str overflow");
 
 	d = data;
 	chk = data;
 	d = mp_encode_array(d, 2);
 	d = mp_encode_bin(d, "", 0);
 	d = mp_encode_binl(d, UINT32_MAX);
-	is(mp_check(&chk, d), 1, "mp_check bin overflow")
+	is(mp_check(&chk, d), 1, "mp_check bin overflow");
 
 	d = data;
 	chk = data;
 	d = mp_encode_array(d, 2);
 	d = mp_encode_str0(d, "");
 	d = mp_encode_strl(d, UINT32_MAX);
-	is(mp_check(&chk, d), 1, "mp_check str overflow")
+	is(mp_check(&chk, d), 1, "mp_check str overflow");
 
 	footer();
 	return check_plan();

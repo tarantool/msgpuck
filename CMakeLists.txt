@@ -1,4 +1,4 @@
-project(msgpuck C)
+project(msgpuck C CXX)
 cmake_minimum_required(VERSION 2.8.5)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")

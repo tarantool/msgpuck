@@ -51,6 +51,16 @@
 #define lengthof(array) (sizeof(array) / sizeof((array)[0]))
 #endif
 
+#ifndef __has_attribute
+#  define __has_attribute(x) 0
+#endif
+
+#if __has_attribute(noinline) || defined(__GNUC__)
+#  define NOINLINE __attribute__((noinline))
+#else
+#  define NOINLINE
+#endif
+
 static char buf[BUF_MAXLEN + 1];
 static char str[STRBIN_MAXLEN];
 static char *data = buf + 1; /* use unaligned address to fail early */
@@ -742,7 +752,11 @@ test_next_on_maps(void)
 	return check_plan();
 }
 
-static bool
+/**
+ * When inlined in Release in clang, this function behaves weird. Looking
+ * sometimes like if its call had no effect even though it did encoding.
+ */
+static NOINLINE bool
 test_encode_uint_custom_size(char *buf, uint64_t val, int size)
 {
 	char *pos;
@@ -779,7 +793,12 @@ test_encode_uint_custom_size(char *buf, uint64_t val, int size)
 	return false;
 }
 
-static bool
+/**
+ * Unlike test_encode_uint_custom_size(), this one doesn't seem to behave
+ * strange when inlined, but perhaps it just wasn't used in all the same ways as
+ * the former.
+ */
+static NOINLINE bool
 test_encode_int_custom_size(char *buf, int64_t val, int size)
 {
 	char *pos;

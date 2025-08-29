@@ -18,6 +18,8 @@ add_library(msgpuck STATIC msgpuck.c hints.c)
 set_target_properties(msgpuck PROPERTIES VERSION 1.0 SOVERSION 1)
 set_target_properties(msgpuck PROPERTIES OUTPUT_NAME "msgpuck")
 
+add_subdirectory(perf)
+
 if (NOT ${PROJECT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR})
     # Embedded mode, skip tests, documentation and the install targets
     return()

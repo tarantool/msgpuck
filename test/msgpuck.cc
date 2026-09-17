@@ -2044,10 +2044,102 @@ test_overflow()
 	return check_plan();
 }
 
+static int
+test_split(void)
+{
+	plan(34);
+	header();
+
+	const int max_chunk_count = 10;
+	const char *chunks[max_chunk_count];
+	int chunk_count;
+	const size_t buf_size = 1024;
+	char buf[buf_size];
+	size_t size;
+	const char *p;
+
+	size = mp_format(buf, buf_size, "%d", 12345);
+
+	p = buf;
+	mp_split(&p, /*min_chunk_size=*/1, max_chunk_count,
+		 &chunk_count, chunks);
+	is(p, buf + size);
+	is(chunk_count, 1);
+	is(chunks[0], buf);
+
+	p = buf;
+	mp_split(&p, /*min_chunk_size=*/100, max_chunk_count,
+		 &chunk_count, chunks);
+	is(p, buf + size);
+	is(chunk_count, 1);
+	is(chunks[0], buf);
+
+	size = mp_format(buf, buf_size, "[%s%d%s]", "foo", 123, "bar");
+
+	p = buf;
+	mp_split(&p, /*min_chunk_size=*/1, max_chunk_count,
+		 &chunk_count, chunks);
+	is(p, buf + size);
+	is(chunk_count, 4);
+	is(chunks[0], buf);
+	is(chunks[1], buf + 1);
+	is(chunks[2], buf + 5);
+	is(chunks[3], buf + 6);
+
+	p = buf;
+	mp_split(&p, /*min_chunk_size=*/6, max_chunk_count,
+		 &chunk_count, chunks);
+	is(p, buf + size);
+	is(chunk_count, 2);
+	is(chunks[0], buf);
+	is(chunks[1], buf + 6);
+
+	size = mp_format(buf, buf_size, "{%s%d%s%d}", "foo", 123, "bar", 456);
+
+	p = buf;
+	mp_split(&p, /*min_chunk_size=*/2, max_chunk_count,
+		 &chunk_count, chunks);
+	is(p, buf + size);
+	is(chunk_count, 3);
+	is(chunks[0], buf);
+	is(chunks[1], buf + 5);
+	is(chunks[2], buf + 10);
+
+	p = buf;
+	mp_split(&p, /*min_chunk_size=*/11, max_chunk_count,
+		 &chunk_count, chunks);
+	is(p, buf + size);
+	is(chunk_count, 1);
+	is(chunks[0], buf);
+
+	size = mp_format(buf, buf_size, "{%s[%d%d%d]%s[{%s%s%s%s}]}",
+			 "foo", 1, 2, 3, "bar", "a", "b", "x", "y");
+
+	p = buf;
+	mp_split(&p, /*min_chunk_size=*/6, max_chunk_count,
+		 &chunk_count, chunks);
+	is(p, buf + size);
+	is(chunk_count, 4);
+	is(chunks[0], buf);
+	is(chunks[1], buf + 6);
+	is(chunks[2], buf + 13);
+	is(chunks[3], buf + 19);
+
+	p = buf;
+	mp_split(&p, /*min_chunk_size=*/6, /*max_chunk_count=*/2,
+		 &chunk_count, chunks);
+	is(p, buf + size);
+	is(chunk_count, 2);
+	is(chunks[0], buf);
+	is(chunks[1], buf + 6);
+
+	footer();
+	return check_plan();
+}
 
 int main()
 {
-	plan(27);
+	plan(28);
 	header();
 
 	test_uints();
@@ -2077,6 +2169,7 @@ int main()
 	test_mp_check_error();
 	test_mp_read_typed();
 	test_overflow();
+	test_split();
 
 	footer();
 	return check_plan();

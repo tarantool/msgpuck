@@ -434,3 +434,31 @@ mp_snprint(char *buf, int size, const char *data)
 {
 	return mp_snprint_recursion(buf, size, &data, MP_PRINT_MAX_DEPTH);
 }
+
+void
+mp_split(const char **data, size_t min_chunk_size, int max_chunk_count,
+	 int *chunk_count, const char **chunks)
+{
+	assert(max_chunk_count > 0);
+	assert(min_chunk_size > 0);
+	*chunk_count = 1;
+	chunks[0] = *data;
+	for (int64_t k = 1; k > 0; k--) {
+		size_t chunk_size = *data - chunks[*chunk_count - 1];
+		if (chunk_size >= min_chunk_size &&
+		    *chunk_count < max_chunk_count) {
+			++*chunk_count;
+			chunks[*chunk_count - 1] = *data;
+		}
+		switch (mp_typeof(**data)) {
+		case MP_ARRAY:
+			k += mp_decode_array(data);
+			break;
+		case MP_MAP:
+			k += 2 * mp_decode_map(data);
+			break;
+		default:
+			mp_next(data);
+		}
+	}
+}

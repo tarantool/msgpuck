@@ -1330,6 +1330,31 @@ int
 mp_check_ext_data_default(int8_t type, const char *data, uint32_t len);
 
 /**
+ * \brief Split packed \a data into chunks.
+ *
+ * \param data - the pointer to a buffer
+ * \param min_chunk_size - the min size of a produced chunk
+ * \param max_chunk_count - the max number of produced chunks
+ * \param[out] chunk_count - the actual number of produced chunks
+ * \param[out] chunks - the array of pointers to produced chunks
+ *
+ * \pre min_chunk_size > 0
+ * \pre max_chunk_count > 0
+ * \post *chunk_count > 0
+ * \post *chunk_count <= max_chunk_count
+ * \post chunks[0] = *data
+ * \post *data = *data + mp_sizeof_TYPE() where TYPE is mp_typeof(**data)
+ *
+ * \note The input is split by elementary type boundaries (for example,
+ * a string is never split in the middle), which means that it's safe to
+ * use mp_decode_TYPE() functions on the produced chunks.
+ */
+void
+mp_split(const char **data, size_t min_chunk_size, int max_chunk_count,
+	 int *chunk_count, const char **chunks);
+
+
+/**
  * \brief Check that \a cur buffer has enough bytes to decode a string header
  * \param cur buffer
  * \param end end of the buffer

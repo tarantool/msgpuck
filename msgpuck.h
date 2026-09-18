@@ -1348,6 +1348,9 @@ mp_check_ext_data_default(int8_t type, const char *data, uint32_t len);
  * \note The input is split by elementary type boundaries (for example,
  * a string is never split in the middle), which means that it's safe to
  * use mp_decode_TYPE() functions on the produced chunks.
+ *
+ * \note It's unsafe to use mp_next() on chunked data. You should use
+ * mp_next_chunked() instead.
  */
 void
 mp_split(const char **data, size_t min_chunk_size, int max_chunk_count,
@@ -1707,6 +1710,25 @@ mp_read_double_lossy(const char **data, double *ret);
  */
 MP_PROTO void
 mp_next(const char **data);
+
+/**
+ * \brief Skip one element in a packed chunked \a data.
+ *
+ * This is a variant of mp_next() that works on packed data split by elementary
+ * type boundaries using mp_split().
+ *
+ * \param data - the pointer to a buffer
+ * \param boundaries - the pointer to an array that stores chunk boundaries
+ *                     [end_1, begin_2, end_2, begin_3, ..., end_N]
+ *                     where begin_i is a pointer to the first byte of chunk i
+ *                     and end_i is a pointer to the byte following the last
+ *                     byte of chunk i
+ * \post *data points to the byte following the last byte of the skipped element
+ * \post *boundaries points to the array element that stores the end boundary of
+ *       the chunk containing the last byte of the skipped element
+ */
+MP_PROTO void
+mp_next_chunked(const char **data, const char ***boundaries);
 
 /** mp_check() error type. */
 enum mp_check_error_type {
@@ -3121,12 +3143,17 @@ enum {
 };
 
 MP_PROTO void
-mp_next_slowpath(const char **data, int64_t k);
+mp_next_slowpath(const char **data, const char ***boundaries, int64_t k);
 
 MP_IMPL void
-mp_next_slowpath(const char **data, int64_t k)
+mp_next_slowpath(const char **data, const char ***boundaries, int64_t k)
 {
 	for (; k > 0; k--) {
+		if (mp_unlikely(*data == **boundaries)) {
+			++*boundaries;
+			*data = **boundaries;
+			++*boundaries;
+		}
 		uint8_t c = mp_load_u8(data);
 		int l = mp_parser_hint[c];
 		if (mp_likely(l >= 0)) {
@@ -3235,10 +3262,15 @@ mp_next_slowpath(const char **data, int64_t k)
 }
 
 MP_IMPL void
-mp_next(const char **data)
+mp_next_chunked(const char **data, const char ***boundaries)
 {
 	int64_t k = 1;
 	for (; k > 0; k--) {
+		if (mp_unlikely(*data == **boundaries)) {
+			++*boundaries;
+			*data = **boundaries;
+			++*boundaries;
+		}
 		uint8_t c = mp_load_u8(data);
 		int l = mp_parser_hint[c];
 		if (mp_likely(l >= 0)) {
@@ -3254,10 +3286,19 @@ mp_next(const char **data)
 			continue;
 		} else {
 			*data -= sizeof(uint8_t);
-			mp_next_slowpath(data, k);
+			mp_next_slowpath(data, boundaries, k);
 			return;
 		}
 	}
+}
+
+MP_IMPL void
+mp_next(const char **data)
+{
+	const char *boundaries[] = {NULL};
+	const char **p_boundaries = boundaries;
+	mp_next_chunked(data, &p_boundaries);
+	assert(p_boundaries == boundaries);
 }
 
 MP_IMPL int

@@ -2137,9 +2137,101 @@ test_split(void)
 	return check_plan();
 }
 
+static int
+test_next_chunked(void)
+{
+	plan(19);
+	header();
+
+	const size_t buf_size = 1024;
+	char buf[buf_size];
+	const int boundaries_capacity = 10;
+	const char *boundaries[boundaries_capacity];
+	int boundary_count = 0;
+
+	char *p = buf;
+	p = mp_encode_map(p, 4);
+	p = mp_encode_str0(p, "foo");
+	p = mp_encode_array(p, 3);
+	p = mp_encode_uint(p, 1);
+
+	boundaries[boundary_count++] = p;
+	boundaries[boundary_count++] = p = p + 10;
+
+	p = mp_encode_uint(p, 2);
+	p = mp_encode_uint(p, 3);
+	p = mp_encode_str0(p, "bar");
+	p = mp_encode_int(p, -123);
+	p = mp_encode_str0(p, "fuzz");
+
+	boundaries[boundary_count++] = p;
+	boundaries[boundary_count++] = p = p + 10;
+
+	p = mp_encode_map(p, 2);
+	p = mp_encode_uint(p, 100);
+	p = mp_encode_array(p, 2);
+
+	boundaries[boundary_count++] = p;
+	boundaries[boundary_count++] = p = p + 10;
+
+	p = mp_encode_str0(p, "abc");
+	p = mp_encode_str0(p, "def");
+
+	boundaries[boundary_count++] = p;
+	boundaries[boundary_count++] = p = p + 10;
+
+	p = mp_encode_uint(p, 200);
+	p = mp_encode_nil(p);
+	p = mp_encode_str0(p, "buzz");
+	p = mp_encode_bool(p, true);
+
+	boundaries[boundary_count++] = p;
+
+	ok(p <= buf + buf_size);
+	ok(boundary_count <= boundaries_capacity);
+
+	const char *data = buf;
+	is(mp_typeof(*data), MP_MAP);
+	const char **p_boundaries = &boundaries[0];
+	mp_next_chunked(&data, &p_boundaries);
+	is(data, boundaries[boundary_count - 1]);
+	is(p_boundaries, &boundaries[boundary_count - 1]);
+
+	data = buf + 1;
+	is(mp_typeof(*data), MP_STR);
+	p_boundaries = &boundaries[0];
+	mp_next_chunked(&data, &p_boundaries);
+	is(data, buf + 5);
+	is(mp_typeof(*data), MP_ARRAY);
+	is(p_boundaries, &boundaries[0]);
+	mp_next_chunked(&data, &p_boundaries);
+	is(data, boundaries[1] + 2);
+	is(p_boundaries, &boundaries[2]);
+
+	data = boundaries[3];
+	is(mp_typeof(*data), MP_MAP);
+	p_boundaries = &boundaries[4];
+	mp_next_chunked(&data, &p_boundaries);
+	is(data, boundaries[7] + 3);
+	is(p_boundaries, &boundaries[8]);
+
+	data = boundaries[3] + 2;
+	is(mp_typeof(*data), MP_ARRAY);
+	p_boundaries = &boundaries[4];
+	mp_next_chunked(&data, &p_boundaries);
+	is(data, boundaries[6]);
+	is(p_boundaries, &boundaries[6]);
+	mp_next_chunked(&data, &p_boundaries);
+	is(data, boundaries[7] + 2);
+	is(p_boundaries, &boundaries[8]);
+
+	footer();
+	return check_plan();
+}
+
 int main()
 {
-	plan(28);
+	plan(29);
 	header();
 
 	test_uints();
@@ -2170,6 +2262,7 @@ int main()
 	test_mp_read_typed();
 	test_overflow();
 	test_split();
+	test_next_chunked();
 
 	footer();
 	return check_plan();
